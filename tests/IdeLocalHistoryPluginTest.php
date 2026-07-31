@@ -60,13 +60,13 @@ final class IdeLocalHistoryPluginTest extends TestCase
                 600 => function ($tui, $terminal): void {
                     $tui->handleInput("\x1b\x08"); // ctrl+alt+h — core's key, the plugin's handler
                     $this->assertSame('results', $tui->getFocus()?->getId());
-                    $this->frame($tui);
+                    $this->awaitPainted($tui, $terminal, 'Local History');
                     $this->assertStringContainsString('Local History', AnsiUtils::stripAnsiCodes($terminal->getOutput()));
                     $tui->handleInput("\x1b[B"); // the older snapshot
                     $tui->handleInput("\r");
                 },
                 750 => function ($tui, $terminal): void {
-                    $this->frame($tui);
+                    $this->awaitPainted($tui, $terminal, 'Restored from local history');
                     $this->assertStringContainsString('Restored from local history', AnsiUtils::stripAnsiCodes($terminal->getOutput()));
                     $this->assertStringContainsString('version two', $tui->getById('editor')->getDocument()->getText());
 
@@ -94,7 +94,7 @@ final class IdeLocalHistoryPluginTest extends TestCase
                     $tui->handleInput("\x1b\x08"); // nothing saved yet
                 },
                 450 => function ($tui, $terminal): void {
-                    $this->frame($tui);
+                    $this->awaitPainted($tui, $terminal, 'No local history for this file yet');
                     $this->assertStringContainsString('No local history for this file yet', AnsiUtils::stripAnsiCodes($terminal->getOutput()));
                 },
             ],
