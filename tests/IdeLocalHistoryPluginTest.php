@@ -8,10 +8,13 @@ use PHPUnit\Framework\TestCase;
 use Porta\Tests\Support\ClearsPortaLsp;
 use Porta\Tests\Support\PreservesPath;
 use Porta\Tests\Support\RunsIde;
+use Porta\Tests\Support\Services;
 use Porta\Tests\Support\TempProject;
 use Porta\Tests\Support\UsesBundledPlugins;
+use Porta\Widget\ContextMenu;
 use Porta\Workbench\Dock\BottomDock;
 use Symfony\Component\Tui\Ansi\AnsiUtils;
+use Symfony\Component\Tui\Render\Renderer;
 
 /**
  * Local History through a real IDE, now that it is a plugin — and above all
@@ -57,13 +60,13 @@ final class IdeLocalHistoryPluginTest extends TestCase
                 600 => function ($tui, $terminal): void {
                     $tui->handleInput("\x1b\x08"); // ctrl+alt+h — core's key, the plugin's handler
                     $this->assertSame('results', $tui->getFocus()?->getId());
-                    $tui->tick();
+                    $this->frame($tui);
                     $this->assertStringContainsString('Local History', AnsiUtils::stripAnsiCodes($terminal->getOutput()));
                     $tui->handleInput("\x1b[B"); // the older snapshot
                     $tui->handleInput("\r");
                 },
                 750 => function ($tui, $terminal): void {
-                    $tui->tick();
+                    $this->frame($tui);
                     $this->assertStringContainsString('Restored from local history', AnsiUtils::stripAnsiCodes($terminal->getOutput()));
                     $this->assertStringContainsString('version two', $tui->getById('editor')->getDocument()->getText());
 
@@ -91,7 +94,7 @@ final class IdeLocalHistoryPluginTest extends TestCase
                     $tui->handleInput("\x1b\x08"); // nothing saved yet
                 },
                 450 => function ($tui, $terminal): void {
-                    $tui->tick();
+                    $this->frame($tui);
                     $this->assertStringContainsString('No local history for this file yet', AnsiUtils::stripAnsiCodes($terminal->getOutput()));
                 },
             ],
@@ -121,7 +124,7 @@ final class IdeLocalHistoryPluginTest extends TestCase
                     $tui->handleInput("\x1b\x08"); // list A's history
                     $tui->tick();
                     // Switch the editor to B while the tab is up.
-                    \Porta\Tests\Support\Services::resolve($ide, \Porta\Editor\BufferService::class)
+                    Services::resolve($ide, \Porta\Editor\BufferService::class)
                         ->openFile($project->path('B.php'), \Porta\Editor\OpenFocus::Editor);
                     $tui->tick();
                     $tui->setFocus($tui->getById('results'));
@@ -153,9 +156,40 @@ final class IdeLocalHistoryPluginTest extends TestCase
                     $this->pump(0.2);
                     $tui->tick();
 
-                    $dock = \Porta\Tests\Support\Services::resolve($ide, BottomDock::class);
+                    $dock = Services::resolve($ide, BottomDock::class);
                     $this->assertNull($dock->visiblePanel(), 'no panel opened');
                     $this->assertFalse(is_dir($tui->getById('editor')->getFilePath().'/../.porta/history'), 'and nothing was snapshotted');
+                },
+            ],
+        );
+
+        $this->addToAssertionCount(1);
+    }
+
+    public function testRightClickingTheEditorOffersShowLocalHistory(): void
+    {
+        // The discoverable route: Ctrl+Alt+H is not something anyone finds by
+        // looking, and "what did this file look like before?" is a question
+        // about the file under the pointer.
+        putenv('PATH=/nonexistent');
+        $project = self::project(['a.php' => "x\n"]);
+
+        $this->runIde(
+            $project,
+            $project->path('a.php'),
+            [
+                200 => function ($tui, $terminal, $ide): void {
+                    $tui->tick();
+                    $rect = Services::resolve($ide, Renderer::class)->getWidgetRect($tui->getById('editor'));
+                    $tui->handleInput(\sprintf("\x1b[<2;%d;%dM", $rect->col + 3, $rect->row + 1));
+                    $tui->tick();
+
+                    $widget = Services::resolve($ide, ContextMenu::class);
+                    $labels = array_map(
+                        static fn (array $row): string => trim(AnsiUtils::stripAnsiCodes($row['segment'])),
+                        $widget->segments($widget->panelWidth()),
+                    );
+                    $this->assertNotSame([], array_filter($labels, static fn (string $l): bool => str_contains($l, 'Show Local History')), 'the item is offered: '.implode(' | ', $labels));
                 },
             ],
         );

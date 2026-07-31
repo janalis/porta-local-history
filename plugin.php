@@ -6,6 +6,7 @@ use Porta\LocalHistory\HistoryTool;
 use Porta\LocalHistory\SnapshotStore;
 use Porta\Plugin\Api\AbstractPlugin;
 use Porta\Plugin\Api\PluginApi;
+use Porta\Workbench\Menu\MenuSurface;
 use Symfony\Component\Clock\NativeClock;
 
 /**
@@ -16,8 +17,9 @@ use Symfony\Component\Clock\NativeClock;
  * handler under core's BARE id, so Ctrl+Alt+H still works, an existing
  * `.porta.json` rebind still binds, and the File-menu entry stays where it was
  * instead of moving to the trailing Plugins menu. Core still NAMES the verb in
- * its ActionCatalog; only the implementation is here, which is why there is no
- * `addMenuItem()` call below.
+ * its ActionCatalog; only the implementation is here — which is also why the
+ * `addMenuItem()` below names that bare id and adds only the CONTEXT-menu entry:
+ * the File-menu one is core's own spec, already in place.
  *
  * Enabled by default ({@see \Porta\Config\IdeConfig::DEFAULT_ENABLED_PLUGINS}).
  * Disabling it stops snapshots being TAKEN; the ones already under
@@ -53,6 +55,10 @@ return new class('local-history') extends AbstractPlugin {
             activate: static fn (string $path, int $line) => $tool->restore($line),
         );
         $api->adoptCommand('ide_local_history', $tool->show(...));
+        // Right-click in the editor offers it too: "what did this file look
+        // like before?" is a question about the file you are pointing at, and
+        // Ctrl+Alt+H is not discoverable.
+        $api->addMenuItem('ide_local_history', surface: MenuSurface::EditorContext);
         $api->onFileSaved($tool->snapshot(...));
     }
 };
