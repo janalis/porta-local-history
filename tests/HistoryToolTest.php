@@ -10,7 +10,6 @@ use Porta\I18n\Translator;
 use Porta\LocalHistory\HistoryTool;
 use Porta\LocalHistory\SnapshotStore;
 use Porta\Plugin\Api\PluginApi;
-use Porta\Plugin\Runtime\PluginEvents;
 use Porta\Plugin\Runtime\PluginManager;
 use Porta\Plugin\Runtime\PluginRuntime;
 use Porta\Plugin\Runtime\PluginSettings;
@@ -32,6 +31,7 @@ use Porta\Workbench\Dock\DockToolController;
 use Porta\Workbench\Menu\MenuFileContext;
 use Porta\Workbench\Notifier;
 use Symfony\Component\Clock\MockClock;
+use Symfony\Component\EventDispatcher\EventDispatcher;
 
 /**
  * The tool's refusals — the paths an IDE-level flow never reaches on purpose,
@@ -51,7 +51,7 @@ final class HistoryToolTest extends TestCase
     {
         $this->project = new TempProject(['a.php' => "one\n"]);
         $settings = new PluginSettings($this->project->dir, []);
-        $manager = new PluginManager(new PluginEvents(), $settings);
+        $manager = new PluginManager(new EventDispatcher(), $settings);
         $tui = TestTui::create(100, 24);
         $this->buffers = new BufferManager();
         $this->status = new StatusBarWidget();
