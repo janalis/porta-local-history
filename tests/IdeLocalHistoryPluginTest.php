@@ -5,15 +5,20 @@ declare(strict_types=1);
 namespace Porta\LocalHistory\Tests;
 
 use PHPUnit\Framework\TestCase;
+use Porta\LocalHistory\SnapshotStore;
 use Porta\Tests\Support\ClearsPortaLsp;
 use Porta\Tests\Support\PreservesPath;
+use Porta\Tests\Support\Probe;
 use Porta\Tests\Support\RunsIde;
 use Porta\Tests\Support\Services;
 use Porta\Tests\Support\TempProject;
 use Porta\Tests\Support\UsesBundledPlugins;
 use Porta\Widget\ContextMenu;
 use Porta\Workbench\Dock\BottomDock;
+use Porta\Workbench\Menu\MenuItem;
+use Symfony\Component\Clock\NativeClock;
 use Symfony\Component\Tui\Ansi\AnsiUtils;
+use Symfony\Component\Tui\Render\RenderContext;
 use Symfony\Component\Tui\Render\Renderer;
 
 /**
@@ -166,30 +171,115 @@ final class IdeLocalHistoryPluginTest extends TestCase
         $this->addToAssertionCount(1);
     }
 
-    public function testRightClickingTheEditorOffersShowLocalHistory(): void
+    /** The context menu's labels, as one string. */
+    private function menuLabels(mixed $ide): string
     {
-        // The discoverable route: Ctrl+Alt+H is not something anyone finds by
-        // looking, and "what did this file look like before?" is a question
-        // about the file under the pointer.
+        $widget = Services::resolve($ide, ContextMenu::class);
+
+        return implode(' | ', array_map(
+            static fn (array $row): string => trim(AnsiUtils::stripAnsiCodes($row['segment'])),
+            $widget->segments($widget->panelWidth()),
+        ));
+    }
+
+    /** The tree row index whose rendered text names $file. */
+    private function treeRowOf(mixed $tui, mixed $ide, string $file): int
+    {
+        $tree = $tui->getById('tree');
+        $rect = Services::resolve($ide, Renderer::class)->getWidgetRect($tree);
+        foreach ($tree->render(new RenderContext($rect->columns, $rect->rows)) as $i => $line) {
+            if (str_contains(AnsiUtils::stripAnsiCodes($line), $file)) {
+                return $i;
+            }
+        }
+
+        self::fail('no tree row for '.$file);
+    }
+
+    /** Right-click at a 0-based rect offset (SGR is 1-based, hence the +1 on the row). */
+    private function rightClick(mixed $tui, mixed $ide, string $widgetId, int $colOffset, int $rowOffset): void
+    {
+        $rect = Services::resolve($ide, Renderer::class)->getWidgetRect($tui->getById($widgetId));
+        $tui->handleInput(\sprintf("\x1b[<2;%d;%dM", $rect->col + $colOffset, $rect->row + $rowOffset + 1));
+        $this->frame($tui);
+    }
+
+    public function testEveryRightClickOnAFileOffersShowLocalHistory(): void
+    {
+        // Ctrl+Alt+H is not something anyone finds by looking, and "what did
+        // this file look like before?" is a question about the thing under the
+        // pointer — the editor text, the tab, or the tree row, which is where
+        // it gets asked about a file you are NOT currently editing.
         putenv('PATH=/nonexistent');
-        $project = self::project(['a.php' => "x\n"]);
+        $project = self::project(['a.php' => "x\n", 'other.php' => "y\n"]);
 
         $this->runIde(
             $project,
             $project->path('a.php'),
             [
                 200 => function ($tui, $terminal, $ide): void {
-                    $tui->tick();
-                    $rect = Services::resolve($ide, Renderer::class)->getWidgetRect($tui->getById('editor'));
-                    $tui->handleInput(\sprintf("\x1b[<2;%d;%dM", $rect->col + 3, $rect->row + 1));
-                    $tui->tick();
+                    $this->frame($tui);
 
-                    $widget = Services::resolve($ide, ContextMenu::class);
-                    $labels = array_map(
-                        static fn (array $row): string => trim(AnsiUtils::stripAnsiCodes($row['segment'])),
-                        $widget->segments($widget->panelWidth()),
-                    );
-                    $this->assertNotSame([], array_filter($labels, static fn (string $l): bool => str_contains($l, 'Show Local History')), 'the item is offered: '.implode(' | ', $labels));
+                    $this->rightClick($tui, $ide, 'editor', colOffset: 3, rowOffset: 0);
+                    $this->assertStringContainsString('Show Local History', $this->menuLabels($ide), 'the editor menu offers it');
+                    $tui->handleInput("\x1b");
+                    $this->frame($tui);
+
+                    $this->rightClick($tui, $ide, 'tabs', colOffset: 1, rowOffset: 0);
+                    $this->assertStringContainsString('Show Local History', $this->menuLabels($ide), 'the tab menu offers it');
+                    $tui->handleInput("\x1b");
+                    $this->frame($tui);
+                },
+            ],
+        );
+
+        $this->addToAssertionCount(1);
+    }
+
+    public function testATreeRowShowsTheHistoryOfTheFileYouClicked(): void
+    {
+        // Not the active file's: the whole reason the file surface carries the
+        // clicked path is that right-clicking `other.php` while editing `a.php`
+        // must answer about `other.php`.
+        putenv('PATH=/nonexistent');
+        $project = self::project(['a.php' => "x\n", 'other.php' => "one\n"]);
+
+        $this->runIde(
+            $project,
+            $project->path('a.php'),
+            [
+                300 => function ($tui, $terminal, $ide) use ($project): void {
+                    // Give other.php a snapshot, without ever making it active.
+                    $project->write('other.php', "two\n");
+                    $store = new SnapshotStore($project->dir, new NativeClock(), maxPerFile: 25);
+                    $store->snapshot($project->path('other.php'), "one\n");
+
+                    $this->frame($tui);
+                    $row = $this->treeRowOf($tui, $ide, 'other.php');
+                    $this->rightClick($tui, $ide, 'tree', colOffset: 3, rowOffset: $row);
+                    $labels = $this->menuLabels($ide);
+                    $this->assertStringContainsString('Show Local History', $labels, 'the tree row offers it: '.$labels);
+
+                    // Run it: the dock lists OTHER.php's snapshot, while a.php
+                    // is still the active tab.
+                    $menu = Services::resolve($ide, ContextMenu::class);
+                    /** @var list<MenuItem> $items */
+                    $items = Probe::get($menu, 'items');
+                    $index = null;
+                    foreach ($items as $i => $item) {
+                        if (!str_contains($item->label, 'Show Local History')) {
+                            continue;
+                        }
+                        $index = $i;
+                    }
+                    $this->assertNotNull($index, 'the item is in the list');
+                    $menu->runItem($index);
+                    // The panel OPENING is the discriminator: a.php has no
+                    // snapshots, so had the tool read the active file it would
+                    // have flashed "No local history for this file yet" and
+                    // opened nothing.
+                    $this->await(static fn (): bool => null !== Services::resolve($ide, BottomDock::class)->visiblePanel(), what: "other.php's history list");
+                    $this->assertSame('a.php', basename((string) $tui->getById('editor')->getFilePath()), 'and the active tab never changed');
                 },
             ],
         );

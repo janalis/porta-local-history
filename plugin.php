@@ -59,6 +59,9 @@ return new class('local-history') extends AbstractPlugin {
         // like before?" is a question about the file you are pointing at, and
         // Ctrl+Alt+H is not discoverable.
         $api->addMenuItem('ide_local_history', surface: MenuSurface::EditorContext);
+        // …and on the FILE menus (a tree row, a tab), where it acts on the file
+        // you pointed at rather than the one you happen to be editing.
+        $api->addMenuItem('ide_local_history', surface: MenuSurface::FileContext);
         $api->onFileSaved($tool->snapshot(...));
     }
 };

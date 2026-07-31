@@ -47,10 +47,13 @@ final class HistoryTool
         ($this->store)()->snapshot($path, $content);
     }
 
-    /** Show the active file's snapshots, newest first. */
+    /**
+     * Show a file's snapshots, newest first — the one the invocation is about:
+     * the right-clicked path from a file context menu, else the active file.
+     */
     public function show(): void
     {
-        $path = $this->api->activeFile();
+        $path = $this->api->contextFile();
         if (null === $path) {
             return;
         }

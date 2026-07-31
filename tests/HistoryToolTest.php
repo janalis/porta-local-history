@@ -29,6 +29,7 @@ use Porta\Widget\StatusBarWidget;
 use Porta\Widget\TerminalPanelWidget;
 use Porta\Workbench\Dock\BottomDock;
 use Porta\Workbench\Dock\DockToolController;
+use Porta\Workbench\Menu\MenuFileContext;
 use Porta\Workbench\Notifier;
 use Symfony\Component\Clock\MockClock;
 
@@ -66,6 +67,7 @@ final class HistoryToolTest extends TestCase
             new DockToolController($manager, $this->dock, $this->project->dir),
             TestDockTools::replacer($this->buffers),
             new CodeEditorWidget(),
+            new MenuFileContext(),
         ));
         $api = new PluginApi('local-history', $manager, $this->project->dir, $settings);
         $api->registerListTool(HistoryTool::TOOL, 'Local History');
