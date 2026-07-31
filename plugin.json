@@ -1,0 +1,4 @@
+{
+    "namespace": "Porta\\LocalHistory",
+    "autoload": "src"
+}
