@@ -63,6 +63,7 @@ final class HistoryToolTest extends TestCase
             new RecordingFileOpener(),
             $tui,
             new RecordingDiagnosticsSink(),
+            new CodeEditorWidget(),
             $this->buffers,
             new DockToolController($manager, $this->dock, $this->project->dir),
             TestDockTools::replacer($this->buffers),
