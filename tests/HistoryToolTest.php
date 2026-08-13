@@ -14,6 +14,7 @@ use Porta\Plugin\Runtime\PluginManager;
 use Porta\Plugin\Runtime\PluginRuntime;
 use Porta\Plugin\Runtime\PluginSettings;
 use Porta\Support\Clipboard;
+use Porta\Support\ProjectPaths;
 use Porta\Tests\Support\PreservesPath;
 use Porta\Tests\Support\RecordingChangeMarkSink;
 use Porta\Tests\Support\RecordingDiagnosticsSink;
@@ -69,7 +70,7 @@ final class HistoryToolTest extends TestCase
             new CodeEditorWidget(),
             new RecordingChangeMarkSink(),
             $this->buffers,
-            new DockToolController($manager, $this->dock, $this->project->dir),
+            new DockToolController($manager, $this->dock, new ProjectPaths($this->project->dir)),
             TestDockTools::replacer($this->buffers),
             new CodeEditorWidget(),
             new MenuFileContext(),
