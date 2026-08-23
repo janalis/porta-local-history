@@ -36,6 +36,8 @@ use Porta\Workbench\Notifier;
 use Porta\Workbench\View\ViewRegistry;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\EventDispatcher\EventDispatcher;
+use Symfony\Component\Tui\Ansi\AnsiUtils;
+use Symfony\Component\Tui\Render\RenderContext;
 
 /**
  * The tool's refusals — the paths an IDE-level flow never reaches on purpose,
@@ -50,6 +52,8 @@ final class HistoryToolTest extends TestCase
     private BottomDock $dock;
     private StatusBarWidget $status;
     private TempProject $project;
+    private ResultsPanelWidget $results;
+    private MockClock $clock;
 
     private function tool(): HistoryTool
     {
@@ -59,7 +63,8 @@ final class HistoryToolTest extends TestCase
         $tui = TestTui::create(100, 24);
         $this->buffers = new BufferManager();
         $this->status = new StatusBarWidget();
-        $this->dock = TestBottomDock::create($tui, new TerminalPanelWidget(), new ResultsPanelWidget(), new DebugPanelWidget());
+        $this->results = new ResultsPanelWidget();
+        $this->dock = TestBottomDock::create($tui, new TerminalPanelWidget(), $this->results, new DebugPanelWidget());
         $manager->wireRuntime(new PluginRuntime(
             new Notifier($this->status, $tui),
             new Translator('en'),
@@ -83,9 +88,16 @@ final class HistoryToolTest extends TestCase
         $api->registerListTool(HistoryTool::TOOL, 'Local History');
         $manager->commit($api);
 
-        $store = new SnapshotStore($this->project->dir, new MockClock(), maxPerFile: 25);
+        $this->clock = new MockClock();
+        $store = new SnapshotStore($this->project->dir, $this->clock, maxPerFile: 25);
 
         return new HistoryTool($api, static fn (): SnapshotStore => $store);
+    }
+
+    /** The rendered results panel, stripped of ANSI escapes. */
+    private function panel(): string
+    {
+        return AnsiUtils::stripAnsiCodes(implode("\n", $this->results->render(new RenderContext(100, 12))));
     }
 
     public function testSnapshottingAFileThatIsNoLongerThereGivesUpSilently(): void
@@ -140,5 +152,29 @@ final class HistoryToolTest extends TestCase
 
         $this->assertStringContainsString('Could not read that snapshot', $this->flashText($this->status));
         $this->assertSame("one\n", $this->buffers->active()?->document->getText(), 'the buffer is untouched');
+    }
+
+    public function testOnlyTheNewestRowIsMarkedLatest(): void
+    {
+        $tool = $this->tool();
+        $path = $this->project->path('a.php');
+        $this->buffers->open($path, "one\n");
+        $this->buffers->setActive($path);
+
+        $tool->snapshot($path);
+        $this->buffers->active()->document->insert(' v2');
+        file_put_contents($path, (string) $this->buffers->active()?->document->getText());
+        $this->clock->sleep(1);
+        $tool->snapshot($path);
+
+        $tool->show();
+
+        $plain = $this->panel();
+        $latestCount = substr_count($plain, needle: '(latest)');
+        $this->assertSame(1, $latestCount, 'exactly one row is marked latest: '.$plain);
+
+        $lines = array_values(array_filter(explode("\n", $plain), static fn (string $l): bool => str_contains($l, ':')));
+        $this->assertStringContainsString('(latest)', $lines[0] ?? '', 'the newest row (first, on top) carries the label');
+        $this->assertStringNotContainsString('(latest)', $lines[1] ?? '', 'the older row does not');
     }
 }
