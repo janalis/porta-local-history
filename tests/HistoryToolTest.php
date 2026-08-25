@@ -15,6 +15,7 @@ use Porta\Plugin\Runtime\PluginRuntime;
 use Porta\Plugin\Runtime\PluginSettings;
 use Porta\Support\Clipboard;
 use Porta\Support\ProjectPaths;
+use Porta\Tests\Support\FakePluginLifecycle;
 use Porta\Tests\Support\PreservesPath;
 use Porta\Tests\Support\RecordingChangeMarkSink;
 use Porta\Tests\Support\RecordingDiagnosticsSink;
@@ -83,6 +84,7 @@ final class HistoryToolTest extends TestCase
             new Clipboard($tui),
             new StatusBarWidget(),
             new CodeEditorWidget(),
+            new FakePluginLifecycle(),
         ));
         $api = new PluginApi('local-history', $manager, $this->project->dir, $settings);
         $api->registerListTool(HistoryTool::TOOL, 'Local History');
