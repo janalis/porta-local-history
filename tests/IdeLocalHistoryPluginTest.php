@@ -125,18 +125,18 @@ final class IdeLocalHistoryPluginTest extends TestCase
                     $d->insert("a two\n");
                     $tui->handleInput("\x13"); // save → snapshot of "a one"... and "a two"
                 },
-                450 => static function ($tui, $ignored, $ide) use ($project): void {
+                450 => function ($tui, $ignored, $ide) use ($project): void {
                     $tui->handleInput("\x1b\x08"); // list A's history
-                    $tui->tick();
+                    $this->frame($tui);
                     // Switch the editor to B while the tab is up.
                     Services::resolve($ide, \Porta\Editor\BufferService::class)
                         ->openFile($project->path('B.php'), \Porta\Editor\OpenFocus::Editor);
-                    $tui->tick();
+                    $this->frame($tui);
                     $tui->setFocus($tui->getById('results'));
                     $tui->handleInput("\r");
                 },
                 700 => function ($tui) use ($project): void {
-                    $tui->tick();
+                    $this->frame($tui);
                     $this->assertStringEndsWith('/A.php', (string) $tui->getById('editor')->getFilePath(), 'the listed file was re-opened');
                     $this->assertSame("b untouched\n", (string) file_get_contents($project->path('B.php')), 'B was never written');
                 },
@@ -159,7 +159,7 @@ final class IdeLocalHistoryPluginTest extends TestCase
                     $tui->handleInput("\x13"); // save: nothing snapshots it
                     $tui->handleInput("\x1b\x08"); // ctrl+alt+h: nothing answers
                     $this->pump(0.2);
-                    $tui->tick();
+                    $this->frame($tui);
 
                     $dock = Services::resolve($ide, BottomDock::class);
                     $this->assertNull($dock->visiblePanel(), 'no panel opened');
