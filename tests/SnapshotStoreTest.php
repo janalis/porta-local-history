@@ -47,6 +47,42 @@ final class SnapshotStoreTest extends TestCase
         $this->assertCount(1, $history->list($path));
     }
 
+    public function testSameLengthDifferentContentIsStillSnapshotted(): void
+    {
+        // The dedupe shortcuts on size first — but equal size must fall
+        // through to the byte compare, never read as "identical".
+        $project = new TempProject(['a.php' => 'x']);
+        $clock = $this->clock();
+        $history = new SnapshotStore($project->dir, $clock);
+        $path = $project->path('a.php');
+
+        $history->snapshot($path, 'abc');
+        $clock->sleep(1);
+        $history->snapshot($path, 'abd');
+        $this->assertCount(2, $history->list($path), 'same length is not sameness');
+    }
+
+    public function testASaveLandingOnAnExistingStampReplacesItWithoutOverPruning(): void
+    {
+        // Two saves in the same clock millisecond share a stamp: the second
+        // overwrites the file. The prune math (fed from the reused list, not a
+        // re-scan) must count that entry once — double-counting would prune
+        // the snapshot that was just written.
+        $project = new TempProject(['a.php' => 'x']);
+        $clock = $this->clock();
+        $history = new SnapshotStore($project->dir, $clock, maxPerFile: 1);
+        $path = $project->path('a.php');
+
+        $history->snapshot($path, 'first');
+        $clock->sleep(1);
+        $this->assertSame(1, $history->snapshot($path, 'second'), 'the cap prunes the older stamp');
+
+        $this->assertSame(0, $history->snapshot($path, 'third'), 'the same-stamp overwrite prunes nothing');
+        $list = $history->list($path);
+        $this->assertCount(1, $list);
+        $this->assertSame('third', $history->read($list[0]['file']), 'the overwrite survives its own prune');
+    }
+
     public function testPruneKeepsOnlyTheCap(): void
     {
         $project = new TempProject(['a.php' => 'x']);

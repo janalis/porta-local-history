@@ -46,19 +46,32 @@ final readonly class SnapshotStore
         }
 
         // Skip if identical to the newest snapshot (no-op saves are common).
+        // The size check first: a Ctrl+S is synchronous on the loop, and most
+        // non-identical saves differ in length — no need to read the old
+        // snapshot back just to learn that.
         $existing = $this->list($path);
-        if ([] !== $existing && (is_file($existing[0]['file']) ? file_get_contents($existing[0]['file']) : false) === $content) {
+        $newest = $existing[0]['file'] ?? null;
+        if (null !== $newest && is_file($newest) && filesize($newest) === \strlen($content) && file_get_contents($newest) === $content) {
             return 0;
         }
 
         $stamp = (int) $this->clock->now()->format('Uv');
+        $file = $dir.'/'.$stamp.'.snap';
         try {
-            $this->fs->dumpFile($dir.'/'.$stamp.'.snap', $content);
+            $this->fs->dumpFile($file, $content);
         } catch (IOExceptionInterface) {
             return -1;
         }
 
-        return $this->prune($path);
+        // Prune from the list already in hand plus the file just written —
+        // re-scanning the directory told us nothing this math cannot. A save
+        // landing on an existing stamp (same clock millisecond) overwrote it,
+        // so that entry is replaced, not doubled.
+        $entries = array_values(array_filter($existing, static fn (array $e): bool => $e['stamp'] !== $stamp));
+        $entries[] = ['stamp' => $stamp, 'file' => $file];
+        usort($entries, static fn (array $a, array $b) => $b['stamp'] <=> $a['stamp']);
+
+        return $this->prune($entries);
     }
 
     /**
@@ -89,11 +102,12 @@ final readonly class SnapshotStore
         return false === $content ? null : $content;
     }
 
-    private function prune(string $path): int
+    /** @param list<array{stamp: int, file: string}> $entries newest first, the just-written snapshot included */
+    private function prune(array $entries): int
     {
         // The snapshots live in the directory we just wrote to, so removal here
         // is expected to succeed (Filesystem::remove ignores absent paths).
-        $stale = \array_slice($this->list($path), $this->maxPerFile);
+        $stale = \array_slice($entries, $this->maxPerFile);
         $this->fs->remove(array_column($stale, 'file'));
 
         return \count($stale);
