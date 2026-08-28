@@ -28,7 +28,7 @@ use Symfony\Component\Clock\NativeClock;
 return new class('local-history') extends AbstractPlugin {
     public function activate(PluginApi $api): void
     {
-        $api->registerSetting('maxPerFile', 'Snapshots kept per file', 'int', 25);
+        $api->registerSetting('maxPerFile', 'Snapshots kept per file', 'int', 25, min: 1, max: 500);
 
         // ONE tool, because it remembers which file's snapshots are on display
         // — Enter has to restore into that file, and a per-call instance would
