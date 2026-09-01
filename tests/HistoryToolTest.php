@@ -25,6 +25,7 @@ use Porta\Tests\Support\TempProject;
 use Porta\Tests\Support\TestBottomDock;
 use Porta\Tests\Support\TestDockTools;
 use Porta\Tests\Support\TestTui;
+use Porta\Tree\FileStatuses;
 use Porta\Widget\CodeEditorWidget;
 use Porta\Widget\DebugPanelWidget;
 use Porta\Widget\ResultsPanelWidget;
@@ -75,6 +76,7 @@ final class HistoryToolTest extends TestCase
             new RecordingDiagnosticsSink(),
             new CodeEditorWidget(),
             new RecordingChangeMarkSink(),
+            new FileStatuses(),
             $this->buffers,
             new DockToolController($manager, $this->dock, new ProjectPaths($this->project->dir)),
             TestDockTools::replacer($this->buffers),
