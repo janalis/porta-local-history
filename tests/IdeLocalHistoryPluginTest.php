@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Porta\LocalHistory\Tests;
 
 use PHPUnit\Framework\TestCase;
+use Porta\Config\CommandRegistry;
 use Porta\LocalHistory\SnapshotStore;
 use Porta\Tests\Support\ClearsPortaLsp;
 use Porta\Tests\Support\PreservesPath;
@@ -79,6 +80,69 @@ final class IdeLocalHistoryPluginTest extends TestCase
                     // disk-rewrite dodge: one Ctrl+Z, back to what was on screen.
                     $tui->getById('editor')->handleInput("\x1a");
                     $this->assertStringContainsString('version three', $tui->getById('editor')->getDocument()->getText());
+                },
+            ],
+        );
+
+        $this->addToAssertionCount(1);
+    }
+
+    public function testCompareShowsWHATASnapshotWouldChange(): void
+    {
+        // The half restoring never had: you could put a snapshot back, but not
+        // look at it first. `git diff --no-index` does the comparing — nothing
+        // here computes a diff, the same arrangement the git view has — and
+        // `--no-index` takes two arbitrary paths, so a project that is not a
+        // repository (this fixture is one) is still served.
+        //
+        // PATH is left alone on purpose: this is the one scenario that needs a
+        // real binary.
+        $project = self::project(['A.php' => "start\n"]);
+
+        $this->runIde(
+            $project,
+            $project->path('A.php'),
+            [
+                300 => static function ($tui): void {
+                    $d = $tui->getById('editor')->getDocument();
+                    $d->selectAll();
+                    $d->insert("alpha\nbeta\ngamma\n");
+                    $tui->handleInput("\x13"); // ctrl+s → the older snapshot
+                },
+                450 => static function ($tui): void {
+                    $d = $tui->getById('editor')->getDocument();
+                    $d->selectAll();
+                    $d->insert("alpha\nBETA\ngamma\ndelta\n");
+                    $tui->handleInput("\x13"); // ctrl+s → the newer one, matching disk
+                },
+                600 => function ($tui, $terminal, $ide): void {
+                    Services::resolve($ide, CommandRegistry::class)->run('local-history:compare_snapshot');
+                    $this->awaitPainted($tui, $terminal, 'Compare with Snapshot');
+                    $tui->handleInput("\x1b[B"); // the OLDER snapshot
+                    $tui->handleInput("\r");
+                },
+                800 => function ($tui, $terminal): void {
+                    $this->awaitPainted($tui, $terminal, 'Local History Diff');
+                    $screen = AnsiUtils::stripAnsiCodes($terminal->getOutput());
+
+                    // The hunk body, oldest on the left: `-` is what restoring
+                    // would bring back, `+` what it would take away.
+                    $this->assertStringContainsString('@@', $screen, 'the hunk header survived');
+                    $this->assertStringContainsString('-beta', $screen);
+                    $this->assertStringContainsString('+BETA', $screen);
+                    $this->assertStringContainsString('+delta', $screen);
+                    $this->assertStringNotContainsString('diff --git', $screen, "git's own header is dropped");
+                },
+                950 => function ($tui, $terminal, $ide): void {
+                    // And the snapshot that IS the file on disk says so rather
+                    // than opening a panel with nothing in it. The newest
+                    // snapshot is always this, because saving is what takes one.
+                    Services::resolve($ide, CommandRegistry::class)->run('local-history:compare_snapshot');
+                    $this->awaitPainted($tui, $terminal, 'Compare with Snapshot');
+                    $tui->handleInput("\r"); // the newest, pre-selected
+                },
+                1100 => function ($tui, $terminal): void {
+                    $this->awaitPainted($tui, $terminal, 'That snapshot matches the file on disk');
                 },
             ],
         );

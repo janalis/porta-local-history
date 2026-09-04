@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Porta\LocalHistory\HistoryTool;
+use Porta\LocalHistory\SnapshotDiff;
 use Porta\LocalHistory\SnapshotStore;
 use Porta\Plugin\Api\AbstractPlugin;
 use Porta\Plugin\Api\PluginApi;
@@ -44,6 +45,7 @@ return new class('local-history') extends AbstractPlugin {
                 new NativeClock(),
                 max(1, (int) $api->setting('maxPerFile')),
             ),
+            static fn (): SnapshotDiff => new SnapshotDiff($api->projectRoot()),
         );
 
         $api->registerListTool(
@@ -54,7 +56,14 @@ return new class('local-history') extends AbstractPlugin {
             // open-and-jump, which for a location-less row means nothing.
             activate: static fn (string $path, int $line) => $tool->restore($line),
         );
+        $api->registerListTool(HistoryTool::DIFF_TOOL, 'Local History Diff');
         $api->adoptCommand('ide_local_history', $tool->show(...));
+        // Its own id, not one of core's: core never named a compare verb, and
+        // inventing a bare id here would claim a keybinding slot the keymap
+        // page knows nothing about.
+        $api->registerCommand('compare_snapshot', 'Compare with Local History', $tool->compare(...));
+        $api->addMenuItem('compare_snapshot', surface: MenuSurface::EditorContext);
+        $api->addMenuItem('compare_snapshot', surface: MenuSurface::FileContext);
         // Right-click in the editor offers it too: "what did this file look
         // like before?" is a question about the file you are pointing at, and
         // Ctrl+Alt+H is not discoverable.

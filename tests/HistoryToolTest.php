@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use Porta\Editor\BufferManager;
 use Porta\I18n\Translator;
 use Porta\LocalHistory\HistoryTool;
+use Porta\LocalHistory\SnapshotDiff;
 use Porta\LocalHistory\SnapshotStore;
 use Porta\Plugin\Api\PluginApi;
 use Porta\Plugin\Runtime\PluginManager;
@@ -57,6 +58,9 @@ final class HistoryToolTest extends TestCase
     private ResultsPanelWidget $results;
     private MockClock $clock;
 
+    /** Set before {@see tool()} by the tests that need git absent or stubbed. */
+    private ?SnapshotDiff $differ = null;
+
     private function tool(): HistoryTool
     {
         $this->project = new TempProject(['a.php' => "one\n"]);
@@ -92,10 +96,12 @@ final class HistoryToolTest extends TestCase
         $api->registerListTool(HistoryTool::TOOL, 'Local History');
         $manager->commit($api);
 
+        $api->registerListTool(HistoryTool::DIFF_TOOL, 'Local History Diff');
         $this->clock = new MockClock();
         $store = new SnapshotStore($this->project->dir, $this->clock, maxPerFile: 25);
+        $this->differ ??= new SnapshotDiff($this->project->dir);
 
-        return new HistoryTool($api, static fn (): SnapshotStore => $store);
+        return new HistoryTool($api, static fn (): SnapshotStore => $store, fn (): SnapshotDiff => $this->differ);
     }
 
     /** The rendered results panel, stripped of ANSI escapes. */
@@ -156,6 +162,41 @@ final class HistoryToolTest extends TestCase
 
         $this->assertStringContainsString('Could not read that snapshot', $this->flashText($this->status));
         $this->assertSame("one\n", $this->buffers->active()?->document->getText(), 'the buffer is untouched');
+    }
+
+    public function testComparingWithNoFileOpenDoesNothingAtAll(): void
+    {
+        $tool = $this->tool();
+
+        $tool->compare();
+
+        self::assertSame('', $this->flashText($this->status), 'no file, no question to answer');
+    }
+
+    public function testComparingWithoutGitSaysWHICHHalfIsMissing(): void
+    {
+        // Snapshots still record and still restore without git. Only the
+        // comparison needs it, and an empty panel would not say so.
+        putenv('PATH=/nonexistent');
+        $this->differ = new SnapshotDiff(sys_get_temp_dir());
+        $tool = $this->tool();
+        $this->buffers->open($this->project->path('a.php'), "one\n");
+
+        $tool->compare();
+
+        self::assertSame('Comparing snapshots needs git on your PATH', $this->flashText($this->status));
+    }
+
+    public function testComparingAFileWithNoHistoryYetSaysSo(): void
+    {
+        // The same refusal `show()` gives, and for the same reason: there is
+        // nothing to pick from, so opening a picker would be a dead end.
+        $tool = $this->tool();
+        $this->buffers->open($this->project->path('a.php'), "one\n");
+
+        $tool->compare();
+
+        self::assertSame('No local history for this file yet', $this->flashText($this->status));
     }
 
     public function testOnlyTheNewestRowIsMarkedLatest(): void

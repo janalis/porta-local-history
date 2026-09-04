@@ -24,6 +24,7 @@ use Porta\Workbench\Dock\ToolRun;
 final class HistoryTool
 {
     public const string TOOL = 'local-history';
+    public const string DIFF_TOOL = 'local-history-diff';
 
     /** @var list<string> snapshot files backing the rows currently on display */
     private array $listed = [];
@@ -31,10 +32,14 @@ final class HistoryTool
     /** The file those rows belong to — Enter must restore into IT, not into whatever tab is active now. */
     private ?string $listedPath = null;
 
-    /** @param \Closure(): SnapshotStore $store rebuilt per operation, so the per-file cap setting stays live */
+    /**
+     * @param \Closure(): SnapshotStore $store rebuilt per operation, so the per-file cap setting stays live
+     * @param \Closure(): SnapshotDiff  $diff  likewise: it resolves the git binary, and PATH is not ours
+     */
     public function __construct(
         private readonly PluginApi $api,
         private readonly \Closure $store,
+        private readonly \Closure $diff,
     ) {}
 
     /** Save-time snapshot. The bytes are already on disk when onFileSaved fires. */
@@ -80,6 +85,67 @@ final class HistoryTool
         }
 
         $this->api->showList(self::TOOL, $rows, ToolRun::Finished);
+    }
+
+    /**
+     * Show what a snapshot would change: pick one, then read the diff between
+     * it and the file as it stands.
+     *
+     * A second verb rather than a second meaning for Enter, because restoring
+     * is what the panel is FOR — putting a confirmation step in front of it
+     * would cost the feature its one keystroke.
+     */
+    public function compare(): void
+    {
+        $path = $this->api->contextFile();
+        if (null === $path) {
+            return;
+        }
+
+        $differ = ($this->diff)();
+        if (null === $differ->binary()) {
+            // Snapshots still record and still restore without git; only the
+            // comparison needs it. Say which, rather than open an empty panel.
+            $this->api->flash($this->api->trans('Comparing snapshots needs git on your PATH'));
+
+            return;
+        }
+
+        $snapshots = ($this->store)()->list($path);
+        if ([] === $snapshots) {
+            $this->api->flash($this->api->trans('No local history for this file yet'));
+
+            return;
+        }
+
+        $items = [];
+        foreach ($snapshots as $snapshot) {
+            $items[] = [
+                'label' => date('Y-m-d H:i:s', intdiv($snapshot['stamp'], num2: 1000)),
+                'hint' => basename($path),
+                'value' => $snapshot['file'],
+            ];
+        }
+
+        $this->api->pick($this->api->trans('Compare with Snapshot'), $items, function (string $file) use ($path, $differ): void {
+            $differ->run($file, $path, function (array $lines) use ($path): void {
+                if ([] === $lines) {
+                    $this->api->flash($this->api->trans('That snapshot matches the file on disk'));
+
+                    return;
+                }
+
+                $rows = [];
+                foreach ($lines as $line) {
+                    // Location-less, like the history rows: a diff line has no
+                    // place to jump to, and the panel prints no `file:line`
+                    // rather than inventing one.
+                    $rows[] = ['path' => '', 'line' => 0, 'text' => $line];
+                }
+                $this->api->showList(self::DIFF_TOOL, $rows, ToolRun::Finished);
+                $this->api->flash($this->api->trans('Comparing %file% with a snapshot', ['%file%' => basename($path)]));
+            });
+        });
     }
 
     /**
