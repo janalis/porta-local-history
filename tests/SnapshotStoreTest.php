@@ -145,4 +145,78 @@ final class SnapshotStoreTest extends TestCase
 
         chmod($dir, permissions: 0o755); // restore so TempProject cleanup succeeds
     }
+
+    public function testARENAMEDFileKeepsItsHistory(): void
+    {
+        // The snapshot directory is a hash of the path, so without this the
+        // whole history is orphaned by a rename — at the moment you are most
+        // likely to want it.
+        $project = new TempProject(['a.php' => "v1\n"]);
+        $clock = $this->clock();
+        $history = new SnapshotStore($project->dir, $clock);
+        $old = (string) realpath($project->path('a.php'));
+        $history->snapshot($old, "v1\n");
+        $clock->sleep(1);
+        $history->snapshot($old, "v2\n");
+        rename($old, $new = $project->path('b.php'));
+
+        $history->rename($old, $new);
+
+        $list = $history->list($new);
+        $this->assertCount(2, $list, 'both snapshots came with the file');
+        $this->assertSame("v2\n", $history->read($list[0]['file']));
+        $this->assertSame([], $history->list($old), 'and none is left on the old name');
+    }
+
+    public function testRenamingONTOAPathThatHasHistoryKeepsBothSets(): void
+    {
+        // A server's RenameFile overwrites. The overwritten file's snapshots
+        // are the last copy of what it held, and they are past states of the
+        // file at this path just as much as the incoming ones.
+        $project = new TempProject(['a.php' => "moved\n", 'b.php' => "resident\n"]);
+        $clock = $this->clock();
+        $history = new SnapshotStore($project->dir, $clock);
+        $from = (string) realpath($project->path('a.php'));
+        $to = (string) realpath($project->path('b.php'));
+        $history->snapshot($to, "resident\n");
+        $clock->sleep(1);
+        $history->snapshot($from, "moved\n");
+        rename($from, $to);
+
+        $history->rename($from, $to);
+
+        $contents = array_map($history->read(...), array_column($history->list($to), 'file'));
+        $this->assertSame(["moved\n", "resident\n"], $contents, 'newest first, and neither set was dropped');
+        $this->assertSame([], $history->list($from));
+    }
+
+    public function testRenamingAFileWithNoHistoryDoesNothing(): void
+    {
+        $project = new TempProject(['a.php' => "v1\n", 'b.php' => "v1\n"]);
+        $history = new SnapshotStore($project->dir, $this->clock());
+        $history->snapshot($project->path('b.php'), "v1\n");
+
+        $history->rename($project->path('a.php'), $project->path('b.php'));
+
+        $this->assertCount(1, $history->list($project->path('b.php')), 'the resident history was not touched');
+    }
+
+    public function testAHistoryThatCannotBeMovedIsLeftWhereItIs(): void
+    {
+        // Never destroyed on the way: the snapshots are the only copy of those
+        // past states, so a failed move keeps them unreachable rather than
+        // losing them.
+        $project = new TempProject(['a.php' => 'x']);
+        $history = new SnapshotStore($project->dir, $this->clock());
+        $from = $project->path('a.php');
+        $history->snapshot($from, 'v1');
+        $base = \dirname((string) Probe::invoke($history, 'dirFor', $from));
+        chmod($base, permissions: 0o555);
+
+        $history->rename($from, $project->path('b.php'));
+
+        $this->assertCount(1, $history->list($from), 'still under the old name, still readable');
+
+        chmod($base, permissions: 0o755); // restore so TempProject cleanup succeeds
+    }
 }

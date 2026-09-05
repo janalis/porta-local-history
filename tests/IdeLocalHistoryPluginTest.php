@@ -87,6 +87,64 @@ final class IdeLocalHistoryPluginTest extends TestCase
         $this->addToAssertionCount(1);
     }
 
+    public function testHISTORYFollowsTheFileWhenItIsRenamed(): void
+    {
+        // Snapshots live under a hash of the path, so before the plugin heard
+        // about renames a rename orphaned the lot — at the moment you are most
+        // likely to want them back. This is the whole wire: the tree's rename,
+        // core's FileRenamed fact (newly plugin-observable), the plugin's
+        // listener, the store's move.
+        putenv('PATH=/nonexistent');
+        $project = self::project(['A.php' => "version one\n"]);
+
+        $this->runIde(
+            $project,
+            $project->path('A.php'),
+            [
+                300 => static function ($tui): void {
+                    $d = $tui->getById('editor')->getDocument();
+                    $d->selectAll();
+                    $d->insert("version two\n");
+                    $tui->handleInput("\x13"); // ctrl+s → a snapshot of version one
+                },
+                450 => function ($tui, $terminal, $ide) use ($project): void {
+                    $this->frame($tui);
+                    $this->assertCount(1, new SnapshotStore($project->dir, new NativeClock())->list($project->path('A.php')), 'there is a history to lose');
+
+                    // By label, not by counting Down presses: this plugin adds
+                    // two items of its own to the file menu, so a count here
+                    // would be counting its own contributions.
+                    $this->rightClick($tui, $ide, 'tree', colOffset: 3, rowOffset: $this->treeRowOf($tui, $ide, 'A.php'));
+                    $menu = Services::resolve($ide, ContextMenu::class);
+                    /** @var list<MenuItem> $items */
+                    $items = Probe::get($menu, 'items');
+                    foreach ($items as $i => $item) {
+                        if (!str_contains($item->label, 'Rename')) {
+                            continue;
+                        }
+                        $menu->runItem($i);
+
+                        break;
+                    }
+                },
+                560 => static function ($tui): void {
+                    foreach (range(1, end: 10) as $_) {
+                        $tui->handleInput("\x7f"); // backspace out the prefilled name
+                    }
+                    foreach (mb_str_split('B.php') as $char) {
+                        $tui->handleInput($char);
+                    }
+                    $tui->handleInput("\r");
+                },
+            ],
+        );
+
+        $history = new SnapshotStore($project->dir, new NativeClock());
+        $this->assertFileExists($project->path('B.php'), 'renamed on disk');
+        $this->assertCount(1, $history->list($project->path('B.php')), 'the snapshot came with the file');
+        $this->assertSame([], $history->list($project->path('A.php')), 'and none is left on the old name');
+    }
+
     public function testCompareShowsWHATASnapshotWouldChange(): void
     {
         // The half restoring never had: you could put a snapshot back, but not

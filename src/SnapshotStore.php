@@ -95,6 +95,52 @@ final readonly class SnapshotStore
         return $entries;
     }
 
+    /**
+     * Move a file's snapshots to the name it now has.
+     *
+     * Without this a rename orphans a file's entire history — at the moment you
+     * are most likely to want it — because the directory is keyed by a hash of
+     * the path and nothing ever looks under the old one again.
+     *
+     * A rename ONTO a path that already has history keeps both sets: the
+     * overwritten file's snapshots are the last copy of what it held, and they
+     * are past states of the file at this path just as much as the incoming
+     * ones. They are merged rather than replaced, and a stamp collision leaves
+     * the resident snapshot alone — same millisecond, and one of them has to
+     * win.
+     *
+     * Only a FILE rename is followed. A directory's is not reachable: the
+     * layout is `md5(path)` and that does not run backwards, so there is no way
+     * to enumerate the snapshot dirs belonging to files inside it.
+     */
+    public function rename(string $from, string $to): void
+    {
+        $old = $this->dirFor($from);
+        if (!is_dir($old)) {
+            return;
+        }
+        $new = $this->dirFor($to);
+        try {
+            if (!is_dir($new)) {
+                $this->fs->rename($old, $new);
+
+                return;
+            }
+            foreach ($this->list($from) as $entry) {
+                $target = $new.'/'.basename($entry['file']);
+                if (!is_file($target)) {
+                    $this->fs->rename($entry['file'], $target);
+                }
+            }
+            $this->fs->remove($old);
+
+            // @mago-expect lint:no-empty-catch-clause -- a history that could not be moved
+            // stays where it was: unreachable, but never destroyed on the way. There is
+            // nothing to report to a user who did not ask for this and nothing they could do.
+        } catch (IOExceptionInterface) {
+        }
+    }
+
     public function read(string $snapFile): ?string
     {
         $content = is_file($snapFile) ? file_get_contents($snapFile) : false;

@@ -53,6 +53,17 @@ final class HistoryTool
     }
 
     /**
+     * Follow a renamed file, so its history is still under Ctrl+Alt+H.
+     *
+     * The store is rebuilt per operation like everywhere else here — the cap is
+     * a live setting — and both paths arrive canonical from the fact.
+     */
+    public function follow(string $from, string $to): void
+    {
+        ($this->store)()->rename($from, $to);
+    }
+
+    /**
      * Show a file's snapshots, newest first — the one the invocation is about:
      * the right-clicked path from a file context menu, else the active file.
      */

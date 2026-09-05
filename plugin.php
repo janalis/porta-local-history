@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use Porta\Event\FileRenamed;
+use Porta\Event\PluginObservable;
 use Porta\LocalHistory\HistoryTool;
 use Porta\LocalHistory\SnapshotDiff;
 use Porta\LocalHistory\SnapshotStore;
@@ -72,5 +74,15 @@ return new class('local-history') extends AbstractPlugin {
         // you pointed at rather than the one you happen to be editing.
         $api->addMenuItem('ide_local_history', surface: MenuSurface::FileContext);
         $api->onFileSaved($tool->snapshot(...));
+        // Snapshots are keyed by a hash of the path, so a rename orphans a
+        // file's whole history unless something moves it. Core's six
+        // path-keyed stores follow the same fact.
+        $api->on(FileRenamed::class, static function (PluginObservable $event) use ($tool): void {
+            // Widened then narrowed, the way plugins/git does it: on() hands
+            // every listener the marker type, and a closure typed to the
+            // subclass is not one it can accept.
+            \assert($event instanceof FileRenamed, description: 'on() delivers the class it was registered for');
+            $tool->follow($event->from, $event->to);
+        });
     }
 };
