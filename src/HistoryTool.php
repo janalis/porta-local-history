@@ -53,6 +53,19 @@ final class HistoryTool
     }
 
     /**
+     * Keep the content a refactoring overwrote.
+     *
+     * Unlike {@see snapshot()} this does NOT read the file: by the time the
+     * event arrives the new content is already on disk, and the version worth
+     * keeping is the one the write replaced — which the event carries because
+     * it exists nowhere else.
+     */
+    public function snapshotReplaced(string $path, string $previousText): void
+    {
+        ($this->store)()->snapshot($path, $previousText);
+    }
+
+    /**
      * Follow a renamed file, so its history is still under Ctrl+Alt+H.
      *
      * The store is rebuilt per operation like everywhere else here — the cap is

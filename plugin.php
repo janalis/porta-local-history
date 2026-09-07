@@ -74,6 +74,11 @@ return new class('local-history') extends AbstractPlugin {
         // you pointed at rather than the one you happen to be editing.
         $api->addMenuItem('ide_local_history', surface: MenuSurface::FileContext);
         $api->onFileSaved($tool->snapshot(...));
+        // A refactoring rewriting a file with no buffer open is the case with
+        // no other recovery: no save fires, so no snapshot was ever taken, and
+        // there is no undo stack because there is no document. The event hands
+        // over what the write replaced, which is the version worth keeping.
+        $api->onFileRewritten($tool->snapshotReplaced(...));
         // Snapshots are keyed by a hash of the path, so a rename orphans a
         // file's whole history unless something moves it. Core's six
         // path-keyed stores follow the same fact.

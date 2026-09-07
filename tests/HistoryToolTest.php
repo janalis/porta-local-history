@@ -122,6 +122,30 @@ final class HistoryToolTest extends TestCase
         $this->assertFalse(is_dir($this->project->path('.porta/history')), 'and nothing was written');
     }
 
+    /**
+     * A refactoring's overwrite keeps the version it replaced.
+     *
+     * The distinction from {@see HistoryTool::snapshot()} is the whole point:
+     * that one READS the file, and by the time this event arrives the file
+     * already holds the new content. Reading here would store the refactored
+     * version and call it history — the one version that is no help at all,
+     * since it is what is on disk.
+     */
+    public function testAnOverwrittenFileKeepsTheVersionItReplacedAndNotTheNewOne(): void
+    {
+        // The tool builds the project, so it comes first.
+        $tool = $this->tool();
+        $path = $this->project->path('a.php');
+        file_put_contents($path, data: "<?php // AFTER the refactoring\n");
+
+        $tool->snapshotReplaced($path, "<?php // BEFORE the refactoring\n");
+
+        $store = new SnapshotStore($this->project->dir, $this->clock, maxPerFile: 25);
+        $listed = $store->list($path);
+        $this->assertCount(1, $listed);
+        $this->assertSame("<?php // BEFORE the refactoring\n", file_get_contents($listed[0]['file']), 'the replaced text, not what is on disk now');
+    }
+
     public function testShowingWithNoFileOpenDoesNothingAtAll(): void
     {
         // Ctrl+Alt+H with an empty workspace: not even a flash, because there
