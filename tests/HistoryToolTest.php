@@ -39,6 +39,8 @@ use Porta\Workbench\Notifier;
 use Porta\Workbench\View\ViewRegistry;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\EventDispatcher\EventDispatcher;
+use Symfony\Component\Filesystem\Exception\IOException;
+use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Tui\Ansi\AnsiUtils;
 use Symfony\Component\Tui\Render\RenderContext;
 
@@ -60,6 +62,9 @@ final class HistoryToolTest extends TestCase
 
     /** Set before {@see tool()} by the tests that need git absent or stubbed. */
     private ?SnapshotDiff $differ = null;
+
+    /** Set before {@see tool()} by the test that needs the recreate write to fail. */
+    private ?Filesystem $fs = null;
 
     private function tool(): HistoryTool
     {
@@ -102,7 +107,7 @@ final class HistoryToolTest extends TestCase
         $store = new SnapshotStore($this->project->dir, $this->clock, maxPerFile: 25);
         $this->differ ??= new SnapshotDiff($this->project->dir);
 
-        return new HistoryTool($api, static fn (): SnapshotStore => $store, fn (): SnapshotDiff => $this->differ);
+        return new HistoryTool($api, static fn (): SnapshotStore => $store, fn (): SnapshotDiff => $this->differ, $this->fs ?? new Filesystem());
     }
 
     /** The rendered results panel, stripped of ANSI escapes. */
@@ -228,22 +233,15 @@ final class HistoryToolTest extends TestCase
         $this->assertSame("one\n", $this->buffers->active()?->document->getText(), 'the buffer is untouched');
     }
 
-    /**
-     * The listed file is gone by the time Enter lands, and something ELSE is
-     * active. `restore()` asks core to open the listed path and then replaces
-     * "the active document" — so if the open fails, the snapshot lands in
-     * whatever buffer the user happens to be looking at.
-     */
-    public function testRestoringAFileThatIsGoneCannotOverwriteTheOneOnScreen(): void
+    /** The listed file, its history shown, then deleted — with something else on screen. */
+    private function listedThenDeleted(HistoryTool $tool): string
     {
-        $tool = $this->tool();
         $gone = $this->project->path('a.php');
         $this->buffers->open($gone, "one\n");
         $this->buffers->setActive($gone);
         $tool->snapshot($gone);
         $tool->show();
 
-        // a.php is deleted and closed; an unrelated buffer is what is on screen.
         unlink($gone);
         $this->buffers->close($gone);
         $other = $this->project->path('other.php');
@@ -251,10 +249,96 @@ final class HistoryToolTest extends TestCase
         $this->buffers->open($other, "other\n");
         $this->buffers->setActive($other);
 
+        return $gone;
+    }
+
+    /**
+     * The case local history exists for. The file is gone and the snapshots are
+     * the only copy left, so a restore RECREATES it — `replaceDocument()`
+     * declines to touch disk because a file that exists is the user's to keep,
+     * and there is nothing here to keep.
+     */
+    public function testRestoringAFileThatWasDeletedBringsItBack(): void
+    {
+        $tool = $this->tool();
+        $gone = $this->listedThenDeleted($tool);
+
         $tool->restore(0);
 
+        $this->assertFileExists($gone);
+        $this->assertSame("one\n", (string) file_get_contents($gone), 'and it holds the version that was picked');
+    }
+
+    /**
+     * The listed file cannot be recreated. `restore()` ends in
+     * `replaceDocument()`, which replaces whatever is ACTIVE — so giving up
+     * has to mean giving up, not falling through into the buffer on screen.
+     */
+    public function testAFileThatCannotBeRecreatedIsNamedRatherThanRestoredElsewhere(): void
+    {
+        $this->fs = new class extends Filesystem {
+            #[\Override]
+            public function dumpFile(string $filename, $content): void
+            {
+                throw new IOException('disk full');
+            }
+        };
+        $tool = $this->tool();
+        $gone = $this->listedThenDeleted($tool);
+
+        $tool->restore(0);
+
+        $this->assertFileDoesNotExist($gone);
         $this->assertSame("other\n", $this->buffers->active()?->document->getText(), 'the file on screen is not the one that was listed');
-        $this->assertStringContainsString('a.php', $this->flashText($this->status), 'and it says which file it could not restore');
+        $this->assertStringContainsString('a.php', $this->flashText($this->status), 'and it says which file it could not write');
+    }
+
+    /**
+     * The same refusal one step later: the file is there, so nothing is
+     * recreated, but the open does not take effect. (The rig's opener records
+     * rather than opens, which is exactly that shape.) `replaceDocument()` must
+     * still not fire.
+     */
+    public function testARestoreWhoseOpenDoesNotTakeEffectLeavesTheScreenAlone(): void
+    {
+        $tool = $this->tool();
+        $path = $this->project->path('a.php');
+        $this->buffers->open($path, "one\n");
+        $this->buffers->setActive($path);
+        $tool->snapshot($path);
+        $tool->show();
+
+        $other = $this->project->path('other.php');
+        file_put_contents($other, data: "other\n");
+        $this->buffers->open($other, "other\n");
+        $this->buffers->setActive($other);
+
+        $tool->restore(0);
+
+        $this->assertSame("other\n", $this->buffers->active()?->document->getText());
+        $this->assertStringContainsString('a.php', $this->flashText($this->status));
+    }
+
+    /** Enter on a Recent Changes row whose file is gone reaches its history instead of a dead end. */
+    public function testRecentChangesOpensTheHistoryOfAFileThatIsGone(): void
+    {
+        $tool = $this->tool();
+        $gone = $this->listedThenDeleted($tool);
+
+        $tool->openOrShowHistory('a.php', 0);
+
+        $this->assertStringContainsString('is gone', $this->flashText($this->status));
+        $this->assertStringContainsString('latest', $this->panel(), 'and the panel now lists that file\'s snapshots');
+        $this->assertFileDoesNotExist($gone, 'looking is not restoring');
+    }
+
+    /** And a row whose file is still there just opens it. */
+    public function testRecentChangesOpensAFileThatIsStillThere(): void
+    {
+        $tool = $this->tool();
+        $tool->openOrShowHistory('a.php', 0);
+
+        $this->assertStringNotContainsString('is gone', $this->flashText($this->status));
     }
 
     public function testComparingWithNoFileOpenDoesNothingAtAll(): void

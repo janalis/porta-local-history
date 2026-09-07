@@ -93,6 +93,33 @@ final class SnapshotStoreTest extends TestCase
         $this->assertGreaterThan($list[1]['stamp'], $list[0]['stamp']);
     }
 
+    /**
+     * The key must not depend on the file still being there.
+     *
+     * `realpath()` returns false for a path with no file behind it, so a key
+     * built from it changes the moment the file is deleted — and on any tree
+     * reached through a symlink (`/var` on macOS, a symlinked checkout) that
+     * is a DIFFERENT key, which orphans the history at exactly the moment it
+     * becomes the only copy. The directory is still there, so it is what gets
+     * canonicalised.
+     */
+    public function testAFileKeepsItsHistoryAfterItIsDeletedThroughASymlink(): void
+    {
+        $project = new TempProject(['real/a.php' => "v1\n"]);
+        symlink($project->path('real'), $project->path('link'));
+        $history = new SnapshotStore($project->dir, $this->clock());
+        $viaLink = $project->path('link/a.php');
+
+        $this->assertSame(0, $history->snapshot($viaLink, "v1\n"));
+        $this->assertCount(1, $history->list($viaLink), 'found while the file is there');
+
+        unlink($project->path('real/a.php'));
+
+        $list = $history->list($viaLink);
+        $this->assertCount(1, $list, 'and still found once it is gone');
+        $this->assertSame("v1\n", $history->read($list[0]['file']));
+    }
+
     public function testIdenticalContentIsNotDuplicated(): void
     {
         $project = new TempProject(['a.php' => 'x']);

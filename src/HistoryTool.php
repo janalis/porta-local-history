@@ -6,6 +6,8 @@ namespace Porta\LocalHistory;
 
 use Porta\Plugin\Api\PluginApi;
 use Porta\Workbench\Dock\ToolRun;
+use Symfony\Component\Filesystem\Exception\IOExceptionInterface;
+use Symfony\Component\Filesystem\Filesystem;
 
 /**
  * The feature itself: snapshot on save, list a file's snapshots in a dock tab,
@@ -41,6 +43,10 @@ final class HistoryTool
         private readonly PluginApi $api,
         private readonly \Closure $store,
         private readonly \Closure $diff,
+        // Defaulted, the {@see \Porta\GraphViewer\ArchitectureArtifact} pattern:
+        // only the recreate path writes, and a test that wants it to fail
+        // passes a throwing one.
+        private readonly Filesystem $fs = new Filesystem(),
     ) {}
 
     /**
@@ -122,6 +128,16 @@ final class HistoryTool
             return;
         }
 
+        $this->showFor($path);
+    }
+
+    /**
+     * The same list for a path that is NOT the file on screen — which for a
+     * file that has been deleted is the only way to reach its history at all,
+     * since there is no buffer for it to be the context of.
+     */
+    public function showFor(string $path): void
+    {
         $snapshots = ($this->store)()->list($path);
         if ([] === $snapshots) {
             $this->api->flash($this->api->trans('No local history for this file yet'));
@@ -144,6 +160,28 @@ final class HistoryTool
         }
 
         $this->api->showList(self::TOOL, $rows, ToolRun::Finished);
+    }
+
+    /**
+     * Enter on a Recent Changes row: open the file, or — when it is gone —
+     * show what is left of it.
+     *
+     * Core's own open-and-jump is right for a file that still exists and is a
+     * dead end for one that does not: it flashes "cannot read" and the
+     * snapshots, which are the only surviving copy, stay unreachable because
+     * the per-file view asks the ACTIVE file what it is about. This is the
+     * case local history exists for, so it is the case that must work.
+     */
+    public function openOrShowHistory(string $path, int $line): void
+    {
+        $absolute = str_starts_with($path, '/') ? $path : $this->api->projectRoot().'/'.$path;
+        if (is_file($absolute)) {
+            $this->api->openFile($absolute);
+
+            return;
+        }
+        $this->api->flash($this->api->trans('%file% is gone — restoring a version will bring it back', ['%file%' => basename($absolute)]));
+        $this->showFor($absolute);
     }
 
     /**
@@ -226,6 +264,20 @@ final class HistoryTool
             $this->api->flash($this->api->trans('Could not read that snapshot'));
 
             return;
+        }
+        // A file that is GONE is recreated from the snapshot rather than
+        // refused. `replaceDocument()` never touches disk because a file that
+        // exists is the user's to keep — but there is nothing here to keep, no
+        // buffer to replace, and this copy is the last one anywhere. Core does
+        // the same for a scratch file: mint it on disk, then open it.
+        if (!is_file($path)) {
+            try {
+                $this->fs->dumpFile($path, $content);
+            } catch (IOExceptionInterface) {
+                $this->api->flash($this->api->trans('Cannot write %file%', ['%file%' => basename($path)]));
+
+                return;
+            }
         }
         if ($this->api->activeFile() !== $path) {
             $this->api->openFile($path);
