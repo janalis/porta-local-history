@@ -25,6 +25,7 @@ final class HistoryTool
 {
     public const string TOOL = 'local-history';
     public const string DIFF_TOOL = 'local-history-diff';
+    public const string RECENT_TOOL = 'local-history-recent';
 
     /** @var list<string> snapshot files backing the rows currently on display */
     private array $listed = [];
@@ -41,6 +42,40 @@ final class HistoryTool
         private readonly \Closure $store,
         private readonly \Closure $diff,
     ) {}
+
+    /**
+     * Every file with history, newest change first — the project-wide view.
+     *
+     * The per-file tool answers "what did THIS file look like before"; this one
+     * answers "what have I been changing", which is the question you have when
+     * you do not yet know which file to ask about. PhpStorm ships both.
+     *
+     * Rows carry a REAL location, unlike the per-file tool's: a path with no
+     * line, so Enter opens the file and the panel prints its name. The verb a
+     * row offers is therefore "take me there", not "restore" — restoring
+     * needs a snapshot chosen, and choosing is what the per-file tool is for.
+     */
+    public function showRecent(): void
+    {
+        $recent = ($this->store)()->recent();
+        if ([] === $recent) {
+            $this->api->flash($this->api->trans('No local history yet'));
+
+            return;
+        }
+
+        $rows = [];
+        foreach ($recent as $entry) {
+            $when = date('Y-m-d H:i:s', intdiv($entry['stamp'], num2: 1000));
+            $rows[] = [
+                'path' => $entry['path'],
+                'line' => 0,
+                'text' => $when.'  '.$this->api->trans('%count% versions', ['%count%' => $entry['count']]),
+            ];
+        }
+
+        $this->api->showList(self::RECENT_TOOL, $rows, ToolRun::Finished);
+    }
 
     /** Save-time snapshot. The bytes are already on disk when onFileSaved fires. */
     public function snapshot(string $path): void

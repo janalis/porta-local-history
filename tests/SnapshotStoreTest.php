@@ -18,6 +18,63 @@ final class SnapshotStoreTest extends TestCase
         return new MockClock('2020-01-01T00:00:00+00:00');
     }
 
+    /**
+     * The store can say WHICH files it holds history for, newest change first.
+     *
+     * It could not before: the directory name is `md5(path)` and a hash does
+     * not run backwards, so a project-wide view had nothing to name its rows
+     * with. Each directory carries a `path` sidecar now.
+     */
+    public function testRecentNamesEveryFileNewestFirst(): void
+    {
+        $project = new TempProject(['a.php' => "a\n", 'b.php' => "b\n"]);
+        $clock = $this->clock();
+        $history = new SnapshotStore($project->dir, $clock);
+
+        $history->snapshot($project->path('a.php'), "a1\n");
+        $clock->sleep(1);
+        $history->snapshot($project->path('b.php'), "b1\n");
+        $clock->sleep(1);
+        $history->snapshot($project->path('a.php'), "a2\n");
+
+        $recent = $history->recent();
+        $this->assertSame([$project->path('a.php'), $project->path('b.php')], array_column($recent, 'path'), 'a changed last');
+        $this->assertSame([2, 1], array_column($recent, 'count'), 'and it has two versions');
+    }
+
+    /**
+     * A directory written before the sidecar existed is SKIPPED, not listed as
+     * a hash: a row nobody can act on is worse than no row, and the next save
+     * on that file adds it back — the format heals rather than migrating.
+     */
+    public function testAHistoryDirectoryWithNoPathSidecarIsSkipped(): void
+    {
+        $project = new TempProject(['a.php' => "a\n"]);
+        $history = new SnapshotStore($project->dir, $this->clock());
+        $history->snapshot($project->path('a.php'), "a1\n");
+
+        $dir = \dirname((string) $history->list($project->path('a.php'))[0]['file']);
+        unlink($dir.'/path');
+
+        $this->assertSame([], $history->recent());
+    }
+
+    /**
+     * A rename moves the directory, and the sidecar inside it would otherwise
+     * travel still naming the OLD path — the one place a rename could leave
+     * this store lying about whose history it holds.
+     */
+    public function testTheSidecarFollowsARename(): void
+    {
+        $project = new TempProject(['old.php' => "x\n"]);
+        $history = new SnapshotStore($project->dir, $this->clock());
+        $history->snapshot($project->path('old.php'), "x1\n");
+
+        $history->rename($project->path('old.php'), $project->path('new.php'));
+
+        $this->assertSame([$project->path('new.php')], array_column($history->recent(), 'path'));
+    }
+
     public function testSnapshotAndList(): void
     {
         $project = new TempProject(['a.php' => "v1\n"]);

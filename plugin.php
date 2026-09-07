@@ -59,6 +59,11 @@ return new class('local-history') extends AbstractPlugin {
             activate: static fn (string $path, int $line) => $tool->restore($line),
         );
         $api->registerListTool(HistoryTool::DIFF_TOOL, 'Local History Diff');
+        // Its rows carry a real path, so core's open-and-jump is exactly right
+        // and no activate hook is needed — unlike the per-file tool above,
+        // whose rows are location-less.
+        $api->registerListTool(HistoryTool::RECENT_TOOL, 'Recent Changes', rerun: $tool->showRecent(...));
+        $api->registerCommand('recent_changes', 'Recent Changes', $tool->showRecent(...));
         $api->adoptCommand('ide_local_history', $tool->show(...));
         // Its own id, not one of core's: core never named a compare verb, and
         // inventing a bare id here would claim a keybinding slot the keymap

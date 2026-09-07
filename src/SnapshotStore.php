@@ -20,6 +20,15 @@ use Symfony\Component\Filesystem\Filesystem;
  */
 final readonly class SnapshotStore
 {
+    /**
+     * Holds the absolute path whose history a directory is.
+     *
+     * The directory name is `md5(path)`, and a hash does not run backwards —
+     * so without this nothing can say which file a snapshot belongs to, which
+     * is exactly what a project-wide view has to answer.
+     */
+    private const string PATH_FILE = 'path';
+
     private string $baseDir;
     private Filesystem $fs;
 
@@ -59,6 +68,16 @@ final readonly class SnapshotStore
         $file = $dir.'/'.$stamp.'.snap';
         try {
             $this->fs->dumpFile($file, $content);
+            // AFTER the snapshot, and in its try: the directory name is a HASH
+            // of the path and hashes do not run backwards, so without this
+            // sidecar nothing can say which file a snapshot belongs to — which
+            // is what a project-wide view has to answer. Written on every
+            // snapshot rather than only on creation, so a directory made
+            // before this existed gains its name the next time the file is
+            // saved and the format heals itself instead of needing a
+            // migration. Naming a directory that has no snapshot in it would
+            // be the wrong order.
+            $this->fs->dumpFile($dir.'/'.self::PATH_FILE, $path);
         } catch (IOExceptionInterface) {
             return -1;
         }
@@ -72,6 +91,35 @@ final readonly class SnapshotStore
         usort($entries, static fn (array $a, array $b) => $b['stamp'] <=> $a['stamp']);
 
         return $this->prune($entries);
+    }
+
+    /**
+     * Every file this store holds history for, and when it last changed —
+     * newest first.
+     *
+     * A directory written before the path sidecar existed cannot be named, so
+     * it is skipped rather than listed as a hash: a row nobody can act on is
+     * worse than a row that is not there, and the next save on that file adds
+     * it back.
+     *
+     * @return list<array{path: string, stamp: int, count: int}>
+     */
+    public function recent(): array
+    {
+        $names = is_dir($this->baseDir) ? scandir($this->baseDir) : false;
+        $out = [];
+        foreach (\is_array($names) ? $names : [] as $name) {
+            $pathFile = $this->baseDir.'/'.$name.'/'.self::PATH_FILE;
+            $path = is_file($pathFile) ? (string) file_get_contents($pathFile) : '';
+            $entries = '' === $path ? [] : $this->list($path);
+            if ([] === $entries) {
+                continue;
+            }
+            $out[] = ['path' => $path, 'stamp' => $entries[0]['stamp'], 'count' => \count($entries)];
+        }
+        usort($out, static fn (array $a, array $b) => $b['stamp'] <=> $a['stamp']);
+
+        return $out;
     }
 
     /**
@@ -123,6 +171,10 @@ final readonly class SnapshotStore
         try {
             if (!is_dir($new)) {
                 $this->fs->rename($old, $new);
+                // The sidecar travelled with the directory still naming the
+                // OLD path, which is the one place a rename could leave this
+                // store telling a lie about whose history it holds.
+                $this->fs->dumpFile($new.'/'.self::PATH_FILE, $to);
 
                 return;
             }
@@ -132,6 +184,7 @@ final readonly class SnapshotStore
                     $this->fs->rename($entry['file'], $target);
                 }
             }
+            $this->fs->dumpFile($new.'/'.self::PATH_FILE, $to);
             $this->fs->remove($old);
 
             // @mago-expect lint:no-empty-catch-clause -- a history that could not be moved

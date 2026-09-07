@@ -94,6 +94,7 @@ final class HistoryToolTest extends TestCase
         ));
         $api = new PluginApi('local-history', $manager, $this->project->dir, $settings);
         $api->registerListTool(HistoryTool::TOOL, 'Local History');
+        $api->registerListTool(HistoryTool::RECENT_TOOL, 'Recent Changes');
         $manager->commit($api);
 
         $api->registerListTool(HistoryTool::DIFF_TOOL, 'Local History Diff');
@@ -144,6 +145,45 @@ final class HistoryToolTest extends TestCase
         $listed = $store->list($path);
         $this->assertCount(1, $listed);
         $this->assertSame("<?php // BEFORE the refactoring\n", file_get_contents($listed[0]['file']), 'the replaced text, not what is on disk now');
+    }
+
+    /**
+     * The project-wide view lists every file with history, newest first, and
+     * its rows carry a REAL path.
+     *
+     * That is the difference from the per-file tool, whose rows are
+     * location-less because they name snapshots rather than files: here Enter
+     * takes core's open-and-jump, and the panel prints the name.
+     */
+    public function testRecentChangesListsEveryFileWithARealLocation(): void
+    {
+        $tool = $this->tool();
+        // Through the TOOL's own store, like every other test here: it is
+        // built inside tool() and a second instance would be a second opinion
+        // about the same directory.
+        $tool->snapshot($this->project->path('a.php'));
+        $this->clock->sleep(1);
+        // On disk, because snapshot() reads the file rather than the buffer.
+        file_put_contents($this->project->path('b.php'), data: "b\n");
+        $tool->snapshot($this->project->path('b.php'));
+
+        $tool->showRecent();
+
+        $panel = $this->panel();
+        $rows = array_values(array_filter(explode("\n", $panel), static fn (string $l): bool => str_contains($l, '.php')));
+        $this->assertStringContainsString('b.php', $rows[0] ?? '', 'the file changed last is on top');
+        $this->assertStringContainsString('a.php', $rows[1] ?? '');
+        // A real location, unlike the per-file tool's rows: Enter takes core's
+        // open-and-jump, and line 1 is where opening a file puts you.
+        $this->assertStringContainsString(':1', $rows[0] ?? '');
+    }
+
+    /** With no history anywhere it says so rather than opening an empty tab. */
+    public function testRecentChangesWithNoHistoryAtAllSaysSo(): void
+    {
+        $this->tool()->showRecent();
+
+        self::assertSame('No local history yet', $this->flashText($this->status));
     }
 
     public function testShowingWithNoFileOpenDoesNothingAtAll(): void
