@@ -228,6 +228,35 @@ final class HistoryToolTest extends TestCase
         $this->assertSame("one\n", $this->buffers->active()?->document->getText(), 'the buffer is untouched');
     }
 
+    /**
+     * The listed file is gone by the time Enter lands, and something ELSE is
+     * active. `restore()` asks core to open the listed path and then replaces
+     * "the active document" — so if the open fails, the snapshot lands in
+     * whatever buffer the user happens to be looking at.
+     */
+    public function testRestoringAFileThatIsGoneCannotOverwriteTheOneOnScreen(): void
+    {
+        $tool = $this->tool();
+        $gone = $this->project->path('a.php');
+        $this->buffers->open($gone, "one\n");
+        $this->buffers->setActive($gone);
+        $tool->snapshot($gone);
+        $tool->show();
+
+        // a.php is deleted and closed; an unrelated buffer is what is on screen.
+        unlink($gone);
+        $this->buffers->close($gone);
+        $other = $this->project->path('other.php');
+        file_put_contents($other, data: "other\n");
+        $this->buffers->open($other, "other\n");
+        $this->buffers->setActive($other);
+
+        $tool->restore(0);
+
+        $this->assertSame("other\n", $this->buffers->active()?->document->getText(), 'the file on screen is not the one that was listed');
+        $this->assertStringContainsString('a.php', $this->flashText($this->status), 'and it says which file it could not restore');
+    }
+
     public function testComparingWithNoFileOpenDoesNothingAtAll(): void
     {
         $tool = $this->tool();

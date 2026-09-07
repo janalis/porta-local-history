@@ -230,6 +230,17 @@ final class HistoryTool
         if ($this->api->activeFile() !== $path) {
             $this->api->openFile($path);
         }
+        // The POSTCONDITION, not the attempt. `replaceDocument()` replaces
+        // whatever is active, and `openFile()` declines a file that has been
+        // deleted or made unreadable — so without this the snapshot of a file
+        // that is gone lands in whichever buffer the user happens to be looking
+        // at. An undo safety net that overwrites an unrelated open file is the
+        // worst thing this plugin could do.
+        if ($this->api->activeFile() !== $path) {
+            $this->api->flash($this->api->trans('Cannot restore %file% — it is no longer there', ['%file%' => basename($path)]));
+
+            return;
+        }
         $this->api->replaceDocument($content);
         $this->api->flash($this->api->trans('Restored from local history'));
     }
