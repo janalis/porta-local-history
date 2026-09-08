@@ -76,7 +76,7 @@ final class HistoryTool
             $rows[] = [
                 'path' => $entry['path'],
                 'line' => 0,
-                'text' => $when.'  '.$this->api->trans('%count% versions', ['%count%' => $entry['count']]),
+                'text' => $when.'  '.$this->api->trans('%count% version|%count% versions', ['%count%' => $entry['count']]),
             ];
         }
 

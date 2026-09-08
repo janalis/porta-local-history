@@ -178,9 +178,29 @@ final class HistoryToolTest extends TestCase
         $rows = array_values(array_filter(explode("\n", $panel), static fn (string $l): bool => str_contains($l, '.php')));
         $this->assertStringContainsString('b.php', $rows[0] ?? '', 'the file changed last is on top');
         $this->assertStringContainsString('a.php', $rows[1] ?? '');
+        // Read off the rendered panel: one snapshot is "1 version", and the
+        // count is the only number on the row that can be either.
+        $this->assertStringContainsString('1 version ', $rows[0] ?? '', 'a count of one is not plural');
+        $this->assertStringNotContainsString('1 versions', $rows[0] ?? '');
         // A real location, unlike the per-file tool's rows: Enter takes core's
         // open-and-jump, and line 1 is where opening a file puts you.
         $this->assertStringContainsString(':1', $rows[0] ?? '');
+    }
+
+    /** And more than one is. */
+    public function testTheVersionCountIsPluralWhenThereIsMoreThanOne(): void
+    {
+        $tool = $this->tool();
+        $path = $this->project->path('a.php');
+        $tool->snapshot($path);
+        $this->clock->sleep(1);
+        file_put_contents($path, data: "two\n");
+        $tool->snapshot($path);
+
+        $tool->showRecent();
+
+        $rows = array_values(array_filter(explode("\n", $this->panel()), static fn (string $l): bool => str_contains($l, '.php')));
+        $this->assertStringContainsString('2 versions', $rows[0] ?? '');
     }
 
     /** With no history anywhere it says so rather than opening an empty tab. */
