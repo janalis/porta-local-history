@@ -156,7 +156,16 @@ final class HistoryTool
             // basename and an index AS a line number — a fake location on every
             // row. The index still rides `line`, invisibly, because Enter's
             // callback is the only channel back.
-            $rows[] = ['path' => '', 'line' => $index, 'text' => $when.(0 === $index ? '  ('.$this->api->trans('latest').')' : '')];
+            //
+            // The NAME rides the text instead, on every row and unconditionally.
+            // These rows are about a file that need not be on screen — reached
+            // by right-clicking another file in the tree, or (since the file
+            // may be gone entirely) from the project-wide view — and a panel
+            // offering to overwrite a file it does not name is the wrong thing
+            // to be looking at. Conditioning it on "is this the active file"
+            // was the first draft and is wrong for the same reason: the answer
+            // changes the moment the user switches tabs, and the rows do not.
+            $rows[] = ['path' => '', 'line' => $index, 'text' => basename($path).'  '.$when.(0 === $index ? '  ('.$this->api->trans('latest').')' : '')];
         }
 
         $this->api->showList(self::TOOL, $rows, ToolRun::Finished);

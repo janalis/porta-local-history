@@ -339,6 +339,33 @@ final class HistoryToolTest extends TestCase
         $this->assertStringContainsString('a.php', $this->flashText($this->status));
     }
 
+    /**
+     * The snapshot rows carry no LOCATION on purpose, so the name has to ride
+     * the text — these rows are about a file that need not be on screen (right
+     * click another file in the tree, or come from the project-wide view for
+     * one that is gone), and a panel offering to overwrite a file it does not
+     * name is the wrong thing to be looking at.
+     */
+    public function testEverySnapshotRowNamesTheFileItIsAbout(): void
+    {
+        $tool = $this->tool();
+        $path = $this->project->path('a.php');
+        $this->buffers->open($path, "one\n");
+        $this->buffers->setActive($path);
+        $tool->snapshot($path);
+        $this->clock->sleep(1);
+        file_put_contents($path, data: "two\n");
+        $tool->snapshot($path);
+
+        $tool->show();
+
+        $rows = array_values(array_filter(explode("\n", $this->panel()), static fn (string $l): bool => str_contains($l, '20')));
+        $this->assertCount(2, $rows);
+        foreach ($rows as $row) {
+            $this->assertStringContainsString('a.php', $row, 'every row, not just the first');
+        }
+    }
+
     /** Enter on a Recent Changes row whose file is gone reaches its history instead of a dead end. */
     public function testRecentChangesOpensTheHistoryOfAFileThatIsGone(): void
     {
@@ -348,7 +375,8 @@ final class HistoryToolTest extends TestCase
         $tool->openOrShowHistory('a.php', 0);
 
         $this->assertStringContainsString('is gone', $this->flashText($this->status));
-        $this->assertStringContainsString('latest', $this->panel(), 'and the panel now lists that file\'s snapshots');
+        $this->assertStringContainsString('a.php  ', $this->panel(), 'and the panel names the file it is about — nothing else on screen does');
+        $this->assertStringContainsString('latest', $this->panel(), 'and lists that file\'s snapshots');
         $this->assertFileDoesNotExist($gone, 'looking is not restoring');
     }
 
