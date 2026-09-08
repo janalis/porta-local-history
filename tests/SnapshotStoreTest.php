@@ -47,7 +47,14 @@ final class SnapshotStoreTest extends TestCase
      * a hash: a row nobody can act on is worse than no row, and the next save
      * on that file adds it back — the format heals rather than migrating.
      */
-    public function testAHistoryDirectoryWithNoPathSidecarIsSkipped(): void
+    /**
+     * A directory written before the sidecar existed gets its name BACK, and
+     * without waiting for the next save on that file — which for a file nobody
+     * is editing any more never comes, and that is the file whose history is
+     * worth having. A hash cannot be inverted; it can be RECOGNISED, and the
+     * paths worth trying are the ones in the project.
+     */
+    public function testAHistoryDirectoryWithNoPathSidecarIsNamedAgainByItsHash(): void
     {
         $project = new TempProject(['a.php' => "a\n"]);
         $history = new SnapshotStore($project->dir, $this->clock());
@@ -56,7 +63,102 @@ final class SnapshotStoreTest extends TestCase
         $dir = \dirname((string) $history->list($project->path('a.php'))[0]['file']);
         unlink($dir.'/path');
 
+        $recent = $history->recent();
+
+        $this->assertSame([$project->path('a.php')], array_column($recent, 'path'));
+        $this->assertFileExists($dir.'/path', 'and the name is written back, so the scan happens once');
+    }
+
+    /**
+     * A directory whose file is not in the project matches nothing, is skipped
+     * as before — and is MARKED, so the walk that failed to name it is not
+     * repeated on every invocation for the rest of the store's life.
+     */
+    public function testADirectoryTheScanCannotNameIsMarkedSoItIsNotRescanned(): void
+    {
+        $project = new TempProject(['a.php' => "a\n"]);
+        $history = new SnapshotStore($project->dir, $this->clock());
+        $history->snapshot($project->path('a.php'), "a1\n");
+
+        $dir = \dirname((string) $history->list($project->path('a.php'))[0]['file']);
+        unlink($dir.'/path');
+        unlink($project->path('a.php'));
+
         $this->assertSame([], $history->recent());
+        $this->assertSame('', (string) file_get_contents($dir.'/path'), 'scanned, and known to be unnameable');
+    }
+
+    /**
+     * A project too big to hash is not walked forever: the scan stops at its
+     * bound and marks what it did not reach, so the cost is paid once whether
+     * or not it succeeded. The next save on any of those names it properly.
+     */
+    public function testAScanThatHitsItsBoundGivesUpAndSaysSo(): void
+    {
+        // A bound of zero rather than a big fixture: which file a walk reaches
+        // first is the filesystem's business, and a test that depends on it is
+        // a test that fails on somebody else's machine.
+        $project = new TempProject(['a.php' => "a\n"]);
+        $history = new SnapshotStore($project->dir, $this->clock(), scanLimit: 0);
+        $history->snapshot($project->path('a.php'), "a1\n");
+        $dir = \dirname((string) $history->list($project->path('a.php'))[0]['file']);
+        unlink($dir.'/path');
+
+        $this->assertSame([], $history->recent(), 'the bound stopped it before anything was hashed');
+        $this->assertSame('', (string) file_get_contents($dir.'/path'), 'and it will not walk again');
+    }
+
+    /**
+     * The skip list is what keeps the walk to thousands of files rather than
+     * tens of thousands, and this is what it costs: a file you edited inside
+     * `vendor/` is not backfilled. It still gets its name on the next save —
+     * the trade is only about the one-off scan.
+     */
+    public function testAFileInASKIPPEDTreeIsNotBackfilled(): void
+    {
+        $project = new TempProject(['vendor/x.php' => "x\n"]);
+        $history = new SnapshotStore($project->dir, $this->clock());
+        $history->snapshot($project->path('vendor/x.php'), "x1\n");
+        $dir = \dirname((string) $history->list($project->path('vendor/x.php'))[0]['file']);
+        unlink($dir.'/path');
+
+        $this->assertSame([], $history->recent(), 'the walk never entered vendor/');
+
+        $history->snapshot($project->path('vendor/x.php'), "x2\n");
+        $this->assertSame([$project->path('vendor/x.php')], array_column($history->recent(), 'path'), 'and a save still names it');
+    }
+
+    /** A history directory gone read-only is not a reason for the project-wide list to fail. */
+    public function testAnUnwritableSidecarIsSwallowedRatherThanThrown(): void
+    {
+        $project = new TempProject(['a.php' => "a\n"]);
+        $history = new SnapshotStore($project->dir, $this->clock());
+        $history->snapshot($project->path('a.php'), "a1\n");
+        $dir = \dirname((string) $history->list($project->path('a.php'))[0]['file']);
+        unlink($dir.'/path');
+        chmod($dir, permissions: 0o555);
+
+        $recent = $history->recent();
+
+        chmod($dir, permissions: 0o755); // restore so TempProject cleanup succeeds
+        $this->assertSame([], $recent, 'the name could not be written, so it stays unnamed');
+    }
+
+    /** And the next save on a marked directory writes the real name over the marker. */
+    public function testASaveNamesADirectoryTheScanHadGivenUpOn(): void
+    {
+        $project = new TempProject(['a.php' => "a\n"]);
+        $history = new SnapshotStore($project->dir, $this->clock());
+        $history->snapshot($project->path('a.php'), "a1\n");
+        $dir = \dirname((string) $history->list($project->path('a.php'))[0]['file']);
+        unlink($dir.'/path');
+        unlink($project->path('a.php'));
+        $history->recent();
+
+        file_put_contents($project->path('a.php'), data: "back\n");
+        $history->snapshot($project->path('a.php'), "back\n");
+
+        $this->assertSame([$project->path('a.php')], array_column($history->recent(), 'path'));
     }
 
     /**
