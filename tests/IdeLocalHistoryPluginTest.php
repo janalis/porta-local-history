@@ -290,7 +290,7 @@ final class IdeLocalHistoryPluginTest extends TestCase
 
                     $dock = Services::resolve($ide, BottomDock::class);
                     $this->assertNull($dock->visiblePanel(), 'no panel opened');
-                    $this->assertFalse(\is_dir($tui->getById('editor')->getFilePath().'/../.porta/history'), 'and nothing was snapshotted');
+                    $this->assertDirectoryDoesNotExist($tui->getById('editor')->getFilePath().'/../.porta/history', 'and nothing was snapshotted');
                 },
             ],
         );

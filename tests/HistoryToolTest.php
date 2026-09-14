@@ -127,7 +127,7 @@ final class HistoryToolTest extends TestCase
         $tool->snapshot($this->project->path('vanished.php'));
 
         $this->assertSame('', $this->flashText($this->status), 'nothing was reported');
-        $this->assertFalse(\is_dir($this->project->path('.porta/history')), 'and nothing was written');
+        $this->assertDirectoryDoesNotExist($this->project->path('.porta/history'), 'and nothing was written');
     }
 
     /**
