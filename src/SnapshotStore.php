@@ -100,7 +100,7 @@ final readonly class SnapshotStore
         // so that entry is replaced, not doubled.
         $entries = \array_values(\array_filter($existing, static fn (array $e): bool => $e['stamp'] !== $stamp));
         $entries[] = ['stamp' => $stamp, 'file' => $file];
-        \usort($entries, static fn (array $a, array $b) => $b['stamp'] <=> $a['stamp']);
+        \usort($entries, static fn (array $a, array $b): int => $b['stamp'] <=> $a['stamp']);
 
         return $this->prune($entries);
     }
@@ -130,7 +130,7 @@ final readonly class SnapshotStore
             }
             $out[] = ['path' => $path, 'stamp' => $entries[0]['stamp'], 'count' => \count($entries)];
         }
-        \usort($out, static fn (array $a, array $b) => $b['stamp'] <=> $a['stamp']);
+        \usort($out, static fn (array $a, array $b): int => $b['stamp'] <=> $a['stamp']);
 
         return $out;
     }
@@ -151,7 +151,7 @@ final readonly class SnapshotStore
                 $entries[] = ['stamp' => (int) $m[1], 'file' => $dir.'/'.$name];
             }
         }
-        \usort($entries, static fn (array $a, array $b) => $b['stamp'] <=> $a['stamp']);
+        \usort($entries, static fn (array $a, array $b): int => $b['stamp'] <=> $a['stamp']);
 
         return $entries;
     }
