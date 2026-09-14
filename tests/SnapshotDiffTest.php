@@ -48,12 +48,12 @@ final class SnapshotDiffTest extends TestCase
 
         [$lines] = $this->diff($differ, $project->path('old.txt'), $project->path('new.txt'));
 
-        self::assertNotNull($lines);
-        self::assertStringStartsWith('@@', $lines[0], 'the first line is a hunk header, not `diff --git`');
-        self::assertContains('-b', $lines, 'what restoring would bring back');
-        self::assertContains('+B', $lines, 'and what it would take away');
-        self::assertContains('+d', $lines);
-        self::assertContains(' a', $lines, 'context lines keep their marker column');
+        $this->assertNotNull($lines);
+        $this->assertStringStartsWith('@@', $lines[0], 'the first line is a hunk header, not `diff --git`');
+        $this->assertContains('-b', $lines, 'what restoring would bring back');
+        $this->assertContains('+B', $lines, 'and what it would take away');
+        $this->assertContains('+d', $lines);
+        $this->assertContains(' a', $lines, 'context lines keep their marker column');
     }
 
     public function testIDENTICALFilesProduceNoLinesAtAll(): void
@@ -65,7 +65,7 @@ final class SnapshotDiffTest extends TestCase
 
         [$lines] = $this->diff($differ, $project->path('one.txt'), $project->path('two.txt'));
 
-        self::assertSame([], $lines);
+        $this->assertSame([], $lines);
     }
 
     public function testGitsOWNFailureReadsAsNoDiffRatherThanAsOutput(): void
@@ -77,22 +77,22 @@ final class SnapshotDiffTest extends TestCase
 
         [$lines] = $this->diff($differ, $project->path('gone.txt'), $project->path('one.txt'));
 
-        self::assertSame([], $lines);
+        $this->assertSame([], $lines);
     }
 
     public function testWithNoGitOnPATHItRefusesToStart(): void
     {
         // Snapshots still record and still restore without git; only the
         // comparison needs it, and the caller turns this false into a message.
-        putenv('PATH=/nonexistent');
+        \putenv('PATH=/nonexistent');
         $project = new TempProject(['one.txt' => "a\n", 'two.txt' => "b\n"]);
         $differ = new SnapshotDiff($project->dir);
 
-        self::assertNull($differ->binary());
+        $this->assertNull($differ->binary());
         [$lines, $started] = $this->diff($differ, $project->path('one.txt'), $project->path('two.txt'));
 
-        self::assertFalse($started);
-        self::assertNull($lines, 'and the callback never fired');
+        $this->assertFalse($started);
+        $this->assertNull($lines, 'and the callback never fired');
     }
 
     public function testAnInjectedBinaryWinsOverThePathWalk(): void
@@ -101,6 +101,6 @@ final class SnapshotDiffTest extends TestCase
         // git does not pay for a second ExecutableFinder walk.
         $project = new TempProject([]);
 
-        self::assertSame('/somewhere/git', new SnapshotDiff($project->dir, '/somewhere/git')->binary());
+        $this->assertSame('/somewhere/git', new SnapshotDiff($project->dir, '/somewhere/git')->binary());
     }
 }

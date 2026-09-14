@@ -43,7 +43,7 @@ final class IdeLocalHistoryPluginTest extends TestCase
 
     public function testSnapshotOnSaveThenRestoreIsOneUndoStep(): void
     {
-        putenv('PATH=/nonexistent');
+        \putenv('PATH=/nonexistent');
         $project = self::project(['A.php' => "version one\n"]);
 
         $this->runIde(
@@ -94,7 +94,7 @@ final class IdeLocalHistoryPluginTest extends TestCase
         // likely to want them back. This is the whole wire: the tree's rename,
         // core's FileRenamed fact (newly plugin-observable), the plugin's
         // listener, the store's move.
-        putenv('PATH=/nonexistent');
+        \putenv('PATH=/nonexistent');
         $project = self::project(['A.php' => "version one\n"]);
 
         $this->runIde(
@@ -119,7 +119,7 @@ final class IdeLocalHistoryPluginTest extends TestCase
                     /** @var list<MenuItem> $items */
                     $items = Probe::get($menu, 'items');
                     foreach ($items as $i => $item) {
-                        if (!str_contains($item->label, 'Rename')) {
+                        if (!\str_contains($item->label, 'Rename')) {
                             continue;
                         }
                         $menu->runItem($i);
@@ -128,10 +128,10 @@ final class IdeLocalHistoryPluginTest extends TestCase
                     }
                 },
                 560 => static function ($tui): void {
-                    foreach (range(1, end: 10) as $_) {
+                    foreach (\range(1, end: 10) as $_) {
                         $tui->handleInput("\x7f"); // backspace out the prefilled name
                     }
-                    foreach (mb_str_split('B.php') as $char) {
+                    foreach (\mb_str_split('B.php') as $char) {
                         $tui->handleInput($char);
                     }
                     $tui->handleInput("\r");
@@ -210,7 +210,7 @@ final class IdeLocalHistoryPluginTest extends TestCase
 
     public function testWithNoSnapshotsItSaysSoInsteadOfOpeningAnEmptyTab(): void
     {
-        putenv('PATH=/nonexistent');
+        \putenv('PATH=/nonexistent');
         $project = self::project(['A.php' => "x\n"]);
 
         $this->runIde(
@@ -234,7 +234,7 @@ final class IdeLocalHistoryPluginTest extends TestCase
     {
         // The bug the move carries a fix for: listing A's history, switching to
         // B and pressing Enter used to write A's snapshot into B.
-        putenv('PATH=/nonexistent');
+        \putenv('PATH=/nonexistent');
         $project = self::project(['A.php' => "a one\n", 'B.php' => "b untouched\n"]);
 
         $this->runIde(
@@ -260,7 +260,7 @@ final class IdeLocalHistoryPluginTest extends TestCase
                 700 => function ($tui) use ($project): void {
                     $this->frame($tui);
                     $this->assertStringEndsWith('/A.php', (string) $tui->getById('editor')->getFilePath(), 'the listed file was re-opened');
-                    $this->assertSame("b untouched\n", (string) file_get_contents($project->path('B.php')), 'B was never written');
+                    $this->assertSame("b untouched\n", (string) \file_get_contents($project->path('B.php')), 'B was never written');
                 },
             ],
         );
@@ -270,7 +270,7 @@ final class IdeLocalHistoryPluginTest extends TestCase
 
     public function testDisablingThePluginTakesTheFeatureWithIt(): void
     {
-        putenv('PATH=/nonexistent');
+        \putenv('PATH=/nonexistent');
         $project = new TempProject(['A.php' => "x\n", '.porta.json' => '{"enabledPlugins":[]}']);
 
         $this->runIde(
@@ -285,7 +285,7 @@ final class IdeLocalHistoryPluginTest extends TestCase
 
                     $dock = Services::resolve($ide, BottomDock::class);
                     $this->assertNull($dock->visiblePanel(), 'no panel opened');
-                    $this->assertFalse(is_dir($tui->getById('editor')->getFilePath().'/../.porta/history'), 'and nothing was snapshotted');
+                    $this->assertFalse(\is_dir($tui->getById('editor')->getFilePath().'/../.porta/history'), 'and nothing was snapshotted');
                 },
             ],
         );
@@ -298,8 +298,8 @@ final class IdeLocalHistoryPluginTest extends TestCase
     {
         $widget = Services::resolve($ide, ContextMenu::class);
 
-        return implode(' | ', array_map(
-            static fn (array $row): string => trim(AnsiUtils::stripAnsiCodes($row['segment'])),
+        return \implode(' | ', \array_map(
+            static fn (array $row): string => \trim(AnsiUtils::stripAnsiCodes($row['segment'])),
             $widget->segments($widget->panelWidth()),
         ));
     }
@@ -310,7 +310,7 @@ final class IdeLocalHistoryPluginTest extends TestCase
         $tree = $tui->getById('tree');
         $rect = Services::resolve($ide, Renderer::class)->getWidgetRect($tree);
         foreach ($tree->render(new RenderContext($rect->columns, $rect->rows)) as $i => $line) {
-            if (str_contains(AnsiUtils::stripAnsiCodes($line), $file)) {
+            if (\str_contains(AnsiUtils::stripAnsiCodes($line), $file)) {
                 return $i;
             }
         }
@@ -332,7 +332,7 @@ final class IdeLocalHistoryPluginTest extends TestCase
         // this file look like before?" is a question about the thing under the
         // pointer — the editor text, the tab, or the tree row, which is where
         // it gets asked about a file you are NOT currently editing.
-        putenv('PATH=/nonexistent');
+        \putenv('PATH=/nonexistent');
         $project = self::project(['a.php' => "x\n", 'other.php' => "y\n"]);
 
         $this->runIde(
@@ -363,7 +363,7 @@ final class IdeLocalHistoryPluginTest extends TestCase
         // Not the active file's: the whole reason the file surface carries the
         // clicked path is that right-clicking `other.php` while editing `a.php`
         // must answer about `other.php`.
-        putenv('PATH=/nonexistent');
+        \putenv('PATH=/nonexistent');
         $project = self::project(['a.php' => "x\n", 'other.php' => "one\n"]);
 
         $this->runIde(
@@ -389,7 +389,7 @@ final class IdeLocalHistoryPluginTest extends TestCase
                     $items = Probe::get($menu, 'items');
                     $index = null;
                     foreach ($items as $i => $item) {
-                        if (!str_contains($item->label, 'Show Local History')) {
+                        if (!\str_contains($item->label, 'Show Local History')) {
                             continue;
                         }
                         $index = $i;
@@ -401,7 +401,7 @@ final class IdeLocalHistoryPluginTest extends TestCase
                     // have flashed "No local history for this file yet" and
                     // opened nothing.
                     $this->await(static fn (): bool => null !== Services::resolve($ide, BottomDock::class)->visiblePanel(), what: "other.php's history list");
-                    $this->assertSame('a.php', basename((string) $tui->getById('editor')->getFilePath()), 'and the active tab never changed');
+                    $this->assertSame('a.php', \basename((string) $tui->getById('editor')->getFilePath()), 'and the active tab never changed');
                 },
             ],
         );

@@ -80,8 +80,8 @@ final readonly class SnapshotDiff
         $started = false;
         // Every body line carries a marker column (' ', '-', '+', '\\'), so
         // there are no blanks to skip once the first hunk header has landed.
-        foreach (explode("\n", rtrim($stdout, characters: "\n")) as $line) {
-            $started = $started || str_starts_with($line, '@@');
+        foreach (\explode("\n", \rtrim($stdout, characters: "\n")) as $line) {
+            $started = $started || \str_starts_with($line, '@@');
             if ($started) {
                 $body[] = $line;
             }

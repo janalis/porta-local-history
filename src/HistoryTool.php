@@ -72,7 +72,7 @@ final class HistoryTool
 
         $rows = [];
         foreach ($recent as $entry) {
-            $when = date('Y-m-d H:i:s', intdiv($entry['stamp'], num2: 1000));
+            $when = \date('Y-m-d H:i:s', \intdiv($entry['stamp'], num2: 1000));
             $rows[] = [
                 'path' => $entry['path'],
                 'line' => 0,
@@ -86,7 +86,7 @@ final class HistoryTool
     /** Save-time snapshot. The bytes are already on disk when onFileSaved fires. */
     public function snapshot(string $path): void
     {
-        $content = is_file($path) ? file_get_contents($path) : false;
+        $content = \is_file($path) ? \file_get_contents($path) : false;
         if (false === $content) {
             return; // deleted or unreadable between the write and this hook
         }
@@ -150,7 +150,7 @@ final class HistoryTool
         $rows = [];
         foreach ($snapshots as $index => $snapshot) {
             $this->listed[] = $snapshot['file'];
-            $when = date('Y-m-d H:i:s', intdiv($snapshot['stamp'], num2: 1000));
+            $when = \date('Y-m-d H:i:s', \intdiv($snapshot['stamp'], num2: 1000));
             // A location-less row (empty path), like the log tools': the panel
             // then prints no `file:line`, where the old core version rendered a
             // basename and an index AS a line number — a fake location on every
@@ -165,7 +165,7 @@ final class HistoryTool
             // to be looking at. Conditioning it on "is this the active file"
             // was the first draft and is wrong for the same reason: the answer
             // changes the moment the user switches tabs, and the rows do not.
-            $rows[] = ['path' => '', 'line' => $index, 'text' => basename($path).'  '.$when.(0 === $index ? '  ('.$this->api->trans('latest').')' : '')];
+            $rows[] = ['path' => '', 'line' => $index, 'text' => \basename($path).'  '.$when.(0 === $index ? '  ('.$this->api->trans('latest').')' : '')];
         }
 
         $this->api->showList(self::TOOL, $rows, ToolRun::Finished);
@@ -183,13 +183,13 @@ final class HistoryTool
      */
     public function openOrShowHistory(string $path, int $line): void
     {
-        $absolute = str_starts_with($path, '/') ? $path : $this->api->projectRoot().'/'.$path;
-        if (is_file($absolute)) {
+        $absolute = \str_starts_with($path, '/') ? $path : $this->api->projectRoot().'/'.$path;
+        if (\is_file($absolute)) {
             $this->api->openFile($absolute);
 
             return;
         }
-        $this->api->flash($this->api->trans('%file% is gone — restoring a version will bring it back', ['%file%' => basename($absolute)]));
+        $this->api->flash($this->api->trans('%file% is gone — restoring a version will bring it back', ['%file%' => \basename($absolute)]));
         $this->showFor($absolute);
     }
 
@@ -227,8 +227,8 @@ final class HistoryTool
         $items = [];
         foreach ($snapshots as $snapshot) {
             $items[] = [
-                'label' => date('Y-m-d H:i:s', intdiv($snapshot['stamp'], num2: 1000)),
-                'hint' => basename($path),
+                'label' => \date('Y-m-d H:i:s', \intdiv($snapshot['stamp'], num2: 1000)),
+                'hint' => \basename($path),
                 'value' => $snapshot['file'],
             ];
         }
@@ -249,7 +249,7 @@ final class HistoryTool
                     $rows[] = ['path' => '', 'line' => 0, 'text' => $line];
                 }
                 $this->api->showList(self::DIFF_TOOL, $rows, ToolRun::Finished);
-                $this->api->flash($this->api->trans('Comparing %file% with a snapshot', ['%file%' => basename($path)]));
+                $this->api->flash($this->api->trans('Comparing %file% with a snapshot', ['%file%' => \basename($path)]));
             });
         });
     }
@@ -279,11 +279,11 @@ final class HistoryTool
         // exists is the user's to keep — but there is nothing here to keep, no
         // buffer to replace, and this copy is the last one anywhere. Core does
         // the same for a scratch file: mint it on disk, then open it.
-        if (!is_file($path)) {
+        if (!\is_file($path)) {
             try {
                 $this->fs->dumpFile($path, $content);
             } catch (IOExceptionInterface) {
-                $this->api->flash($this->api->trans('Cannot write %file%', ['%file%' => basename($path)]));
+                $this->api->flash($this->api->trans('Cannot write %file%', ['%file%' => \basename($path)]));
 
                 return;
             }
@@ -298,7 +298,7 @@ final class HistoryTool
         // at. An undo safety net that overwrites an unrelated open file is the
         // worst thing this plugin could do.
         if ($this->api->activeFile() !== $path) {
-            $this->api->flash($this->api->trans('Cannot restore %file% — it is no longer there', ['%file%' => basename($path)]));
+            $this->api->flash($this->api->trans('Cannot restore %file% — it is no longer there', ['%file%' => \basename($path)]));
 
             return;
         }

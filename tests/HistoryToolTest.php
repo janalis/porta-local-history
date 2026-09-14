@@ -97,7 +97,7 @@ final class HistoryToolTest extends TestCase
             new StatusBarWidget(),
             new CodeEditorWidget(),
             new FakePluginLifecycle(),
-            new FileTreeWidget(sys_get_temp_dir()),
+            new FileTreeWidget(\sys_get_temp_dir()),
         ));
         $api = new PluginApi('local-history', $manager, $this->project->dir, $settings);
         $api->registerListTool(HistoryTool::TOOL, 'Local History');
@@ -115,7 +115,7 @@ final class HistoryToolTest extends TestCase
     /** The rendered results panel, stripped of ANSI escapes. */
     private function panel(): string
     {
-        return AnsiUtils::stripAnsiCodes(implode("\n", $this->results->render(new RenderContext(100, 12))));
+        return AnsiUtils::stripAnsiCodes(\implode("\n", $this->results->render(new RenderContext(100, 12))));
     }
 
     public function testSnapshottingAFileThatIsNoLongerThereGivesUpSilently(): void
@@ -127,7 +127,7 @@ final class HistoryToolTest extends TestCase
         $tool->snapshot($this->project->path('vanished.php'));
 
         $this->assertSame('', $this->flashText($this->status), 'nothing was reported');
-        $this->assertFalse(is_dir($this->project->path('.porta/history')), 'and nothing was written');
+        $this->assertFalse(\is_dir($this->project->path('.porta/history')), 'and nothing was written');
     }
 
     /**
@@ -144,14 +144,14 @@ final class HistoryToolTest extends TestCase
         // The tool builds the project, so it comes first.
         $tool = $this->tool();
         $path = $this->project->path('a.php');
-        file_put_contents($path, data: "<?php // AFTER the refactoring\n");
+        \file_put_contents($path, data: "<?php // AFTER the refactoring\n");
 
         $tool->snapshotReplaced($path, "<?php // BEFORE the refactoring\n");
 
         $store = new SnapshotStore($this->project->dir, $this->clock, maxPerFile: 25);
         $listed = $store->list($path);
         $this->assertCount(1, $listed);
-        $this->assertSame("<?php // BEFORE the refactoring\n", file_get_contents($listed[0]['file']), 'the replaced text, not what is on disk now');
+        $this->assertSame("<?php // BEFORE the refactoring\n", \file_get_contents($listed[0]['file']), 'the replaced text, not what is on disk now');
     }
 
     /**
@@ -171,13 +171,13 @@ final class HistoryToolTest extends TestCase
         $tool->snapshot($this->project->path('a.php'));
         $this->clock->sleep(1);
         // On disk, because snapshot() reads the file rather than the buffer.
-        file_put_contents($this->project->path('b.php'), data: "b\n");
+        \file_put_contents($this->project->path('b.php'), data: "b\n");
         $tool->snapshot($this->project->path('b.php'));
 
         $tool->showRecent();
 
         $panel = $this->panel();
-        $rows = array_values(array_filter(explode("\n", $panel), static fn (string $l): bool => str_contains($l, '.php')));
+        $rows = \array_values(\array_filter(\explode("\n", $panel), static fn (string $l): bool => \str_contains($l, '.php')));
         $this->assertStringContainsString('b.php', $rows[0] ?? '', 'the file changed last is on top');
         $this->assertStringContainsString('a.php', $rows[1] ?? '');
         // Read off the rendered panel: one snapshot is "1 version", and the
@@ -196,12 +196,12 @@ final class HistoryToolTest extends TestCase
         $path = $this->project->path('a.php');
         $tool->snapshot($path);
         $this->clock->sleep(1);
-        file_put_contents($path, data: "two\n");
+        \file_put_contents($path, data: "two\n");
         $tool->snapshot($path);
 
         $tool->showRecent();
 
-        $rows = array_values(array_filter(explode("\n", $this->panel()), static fn (string $l): bool => str_contains($l, '.php')));
+        $rows = \array_values(\array_filter(\explode("\n", $this->panel()), static fn (string $l): bool => \str_contains($l, '.php')));
         $this->assertStringContainsString('2 versions', $rows[0] ?? '');
     }
 
@@ -210,7 +210,7 @@ final class HistoryToolTest extends TestCase
     {
         $this->tool()->showRecent();
 
-        self::assertSame('No local history yet', $this->flashText($this->status));
+        $this->assertSame('No local history yet', $this->flashText($this->status));
     }
 
     public function testShowingWithNoFileOpenDoesNothingAtAll(): void
@@ -245,9 +245,9 @@ final class HistoryToolTest extends TestCase
 
         // The snapshot file disappears between listing and Enter.
         $dir = $this->project->path('.porta/history');
-        $snaps = glob($dir.'/*/*.snap');
+        $snaps = \glob($dir.'/*/*.snap');
         foreach (false === $snaps ? [] : $snaps as $snap) {
-            unlink($snap);
+            \unlink($snap);
         }
         $tool->restore(0);
 
@@ -264,10 +264,10 @@ final class HistoryToolTest extends TestCase
         $tool->snapshot($gone);
         $tool->show();
 
-        unlink($gone);
+        \unlink($gone);
         $this->buffers->close($gone);
         $other = $this->project->path('other.php');
-        file_put_contents($other, data: "other\n");
+        \file_put_contents($other, data: "other\n");
         $this->buffers->open($other, "other\n");
         $this->buffers->setActive($other);
 
@@ -288,7 +288,7 @@ final class HistoryToolTest extends TestCase
         $tool->restore(0);
 
         $this->assertFileExists($gone);
-        $this->assertSame("one\n", (string) file_get_contents($gone), 'and it holds the version that was picked');
+        $this->assertSame("one\n", (string) \file_get_contents($gone), 'and it holds the version that was picked');
     }
 
     /**
@@ -331,7 +331,7 @@ final class HistoryToolTest extends TestCase
         $tool->show();
 
         $other = $this->project->path('other.php');
-        file_put_contents($other, data: "other\n");
+        \file_put_contents($other, data: "other\n");
         $this->buffers->open($other, "other\n");
         $this->buffers->setActive($other);
 
@@ -356,12 +356,12 @@ final class HistoryToolTest extends TestCase
         $this->buffers->setActive($path);
         $tool->snapshot($path);
         $this->clock->sleep(1);
-        file_put_contents($path, data: "two\n");
+        \file_put_contents($path, data: "two\n");
         $tool->snapshot($path);
 
         $tool->show();
 
-        $rows = array_values(array_filter(explode("\n", $this->panel()), static fn (string $l): bool => str_contains($l, '20')));
+        $rows = \array_values(\array_filter(\explode("\n", $this->panel()), static fn (string $l): bool => \str_contains($l, '20')));
         $this->assertCount(2, $rows);
         foreach ($rows as $row) {
             $this->assertStringContainsString('a.php', $row, 'every row, not just the first');
@@ -397,21 +397,21 @@ final class HistoryToolTest extends TestCase
 
         $tool->compare();
 
-        self::assertSame('', $this->flashText($this->status), 'no file, no question to answer');
+        $this->assertSame('', $this->flashText($this->status), 'no file, no question to answer');
     }
 
     public function testComparingWithoutGitSaysWHICHHalfIsMissing(): void
     {
         // Snapshots still record and still restore without git. Only the
         // comparison needs it, and an empty panel would not say so.
-        putenv('PATH=/nonexistent');
-        $this->differ = new SnapshotDiff(sys_get_temp_dir());
+        \putenv('PATH=/nonexistent');
+        $this->differ = new SnapshotDiff(\sys_get_temp_dir());
         $tool = $this->tool();
         $this->buffers->open($this->project->path('a.php'), "one\n");
 
         $tool->compare();
 
-        self::assertSame('Comparing snapshots needs git on your PATH', $this->flashText($this->status));
+        $this->assertSame('Comparing snapshots needs git on your PATH', $this->flashText($this->status));
     }
 
     public function testComparingAFileWithNoHistoryYetSaysSo(): void
@@ -423,7 +423,7 @@ final class HistoryToolTest extends TestCase
 
         $tool->compare();
 
-        self::assertSame('No local history for this file yet', $this->flashText($this->status));
+        $this->assertSame('No local history for this file yet', $this->flashText($this->status));
     }
 
     public function testOnlyTheNewestRowIsMarkedLatest(): void
@@ -435,17 +435,17 @@ final class HistoryToolTest extends TestCase
 
         $tool->snapshot($path);
         $this->buffers->active()->document->insert(' v2');
-        file_put_contents($path, (string) $this->buffers->active()?->document->getText());
+        \file_put_contents($path, (string) $this->buffers->active()?->document->getText());
         $this->clock->sleep(1);
         $tool->snapshot($path);
 
         $tool->show();
 
         $plain = $this->panel();
-        $latestCount = substr_count($plain, needle: '(latest)');
+        $latestCount = \substr_count($plain, needle: '(latest)');
         $this->assertSame(1, $latestCount, 'exactly one row is marked latest: '.$plain);
 
-        $lines = array_values(array_filter(explode("\n", $plain), static fn (string $l): bool => str_contains($l, ':')));
+        $lines = \array_values(\array_filter(\explode("\n", $plain), static fn (string $l): bool => \str_contains($l, ':')));
         $this->assertStringContainsString('(latest)', $lines[0] ?? '', 'the newest row (first, on top) carries the label');
         $this->assertStringNotContainsString('(latest)', $lines[1] ?? '', 'the older row does not');
     }

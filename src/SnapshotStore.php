@@ -73,7 +73,7 @@ final readonly class SnapshotStore
         // snapshot back just to learn that.
         $existing = $this->list($path);
         $newest = $existing[0]['file'] ?? null;
-        if (null !== $newest && is_file($newest) && filesize($newest) === \strlen($content) && file_get_contents($newest) === $content) {
+        if (null !== $newest && \is_file($newest) && \filesize($newest) === \strlen($content) && \file_get_contents($newest) === $content) {
             return 0;
         }
 
@@ -98,9 +98,9 @@ final readonly class SnapshotStore
         // re-scanning the directory told us nothing this math cannot. A save
         // landing on an existing stamp (same clock millisecond) overwrote it,
         // so that entry is replaced, not doubled.
-        $entries = array_values(array_filter($existing, static fn (array $e): bool => $e['stamp'] !== $stamp));
+        $entries = \array_values(\array_filter($existing, static fn (array $e): bool => $e['stamp'] !== $stamp));
         $entries[] = ['stamp' => $stamp, 'file' => $file];
-        usort($entries, static fn (array $a, array $b) => $b['stamp'] <=> $a['stamp']);
+        \usort($entries, static fn (array $a, array $b) => $b['stamp'] <=> $a['stamp']);
 
         return $this->prune($entries);
     }
@@ -119,18 +119,18 @@ final readonly class SnapshotStore
     public function recent(): array
     {
         $this->nameOrphans();
-        $names = is_dir($this->baseDir) ? scandir($this->baseDir) : false;
+        $names = \is_dir($this->baseDir) ? \scandir($this->baseDir) : false;
         $out = [];
         foreach (\is_array($names) ? $names : [] as $name) {
             $pathFile = $this->baseDir.'/'.$name.'/'.self::PATH_FILE;
-            $path = is_file($pathFile) ? (string) file_get_contents($pathFile) : '';
+            $path = \is_file($pathFile) ? (string) \file_get_contents($pathFile) : '';
             $entries = '' === $path ? [] : $this->list($path);
             if ([] === $entries) {
                 continue;
             }
             $out[] = ['path' => $path, 'stamp' => $entries[0]['stamp'], 'count' => \count($entries)];
         }
-        usort($out, static fn (array $a, array $b) => $b['stamp'] <=> $a['stamp']);
+        \usort($out, static fn (array $a, array $b) => $b['stamp'] <=> $a['stamp']);
 
         return $out;
     }
@@ -144,14 +144,14 @@ final readonly class SnapshotStore
     {
         $dir = $this->dirFor($path);
         $entries = [];
-        $names = is_dir($dir) ? scandir($dir) : false;
+        $names = \is_dir($dir) ? \scandir($dir) : false;
         foreach (\is_array($names) ? $names : [] as $name) {
             $m = [];
-            if (preg_match('/^(\d+)\.snap$/', $name, $m)) {
+            if (\preg_match('/^(\d+)\.snap$/', $name, $m)) {
                 $entries[] = ['stamp' => (int) $m[1], 'file' => $dir.'/'.$name];
             }
         }
-        usort($entries, static fn (array $a, array $b) => $b['stamp'] <=> $a['stamp']);
+        \usort($entries, static fn (array $a, array $b) => $b['stamp'] <=> $a['stamp']);
 
         return $entries;
     }
@@ -177,12 +177,12 @@ final readonly class SnapshotStore
     public function rename(string $from, string $to): void
     {
         $old = $this->dirFor($from);
-        if (!is_dir($old)) {
+        if (!\is_dir($old)) {
             return;
         }
         $new = $this->dirFor($to);
         try {
-            if (!is_dir($new)) {
+            if (!\is_dir($new)) {
                 $this->fs->rename($old, $new);
                 // The sidecar travelled with the directory still naming the
                 // OLD path, which is the one place a rename could leave this
@@ -192,8 +192,8 @@ final readonly class SnapshotStore
                 return;
             }
             foreach ($this->list($from) as $entry) {
-                $target = $new.'/'.basename($entry['file']);
-                if (!is_file($target)) {
+                $target = $new.'/'.\basename($entry['file']);
+                if (!\is_file($target)) {
                     $this->fs->rename($entry['file'], $target);
                 }
             }
@@ -209,7 +209,7 @@ final readonly class SnapshotStore
 
     public function read(string $snapFile): ?string
     {
-        $content = is_file($snapFile) ? file_get_contents($snapFile) : false;
+        $content = \is_file($snapFile) ? \file_get_contents($snapFile) : false;
 
         return false === $content ? null : $content;
     }
@@ -220,7 +220,7 @@ final readonly class SnapshotStore
         // The snapshots live in the directory we just wrote to, so removal here
         // is expected to succeed (Filesystem::remove ignores absent paths).
         $stale = \array_slice($entries, $this->maxPerFile);
-        $this->fs->remove(array_column($stale, 'file'));
+        $this->fs->remove(\array_column($stale, 'file'));
 
         return \count($stale);
     }
@@ -243,15 +243,15 @@ final readonly class SnapshotStore
      */
     private function nameOrphans(): void
     {
-        $names = is_dir($this->baseDir) ? scandir($this->baseDir) : false;
+        $names = \is_dir($this->baseDir) ? \scandir($this->baseDir) : false;
         $wanted = [];
         foreach (\is_array($names) ? $names : [] as $name) {
-            if (str_starts_with($name, '.') || !is_dir($this->baseDir.'/'.$name) || is_file($this->baseDir.'/'.$name.'/'.self::PATH_FILE)) {
+            if (\str_starts_with($name, '.') || !\is_dir($this->baseDir.'/'.$name) || \is_file($this->baseDir.'/'.$name.'/'.self::PATH_FILE)) {
                 continue;
             }
             $wanted[$name] = true;
         }
-        if ([] === $wanted || !is_dir($this->rootDir)) {
+        if ([] === $wanted || !\is_dir($this->rootDir)) {
             return;
         }
 
@@ -270,8 +270,8 @@ final readonly class SnapshotStore
                 break;
             }
             $path = $file->getPathname();
-            $real = realpath($path);
-            $hash = substr(md5(false === $real ? $path : $real), offset: 0, length: 16);
+            $real = \realpath($path);
+            $hash = \substr(\md5(false === $real ? $path : $real), offset: 0, length: 16);
             if (!\array_key_exists($hash, $wanted)) {
                 continue;
             }
@@ -287,7 +287,7 @@ final readonly class SnapshotStore
         // land here are pre-sidecar directories whose file has since been
         // deleted or moved out, which nothing could name anyway, and the next
         // save on any of them writes the real name over the marker.
-        foreach (array_keys($wanted) as $hash) {
+        foreach (\array_keys($wanted) as $hash) {
             $this->writeSidecar($hash, '');
         }
     }
@@ -307,7 +307,7 @@ final readonly class SnapshotStore
 
     private function dirFor(string $path): string
     {
-        $resolved = realpath($path);
+        $resolved = \realpath($path);
         if (false === $resolved) {
             // The file is GONE — and a store whose key stops resolving the
             // moment a file is deleted cannot answer the one question it exists
@@ -316,10 +316,10 @@ final readonly class SnapshotStore
             // the name back: on a tree reached through a symlink — /var on
             // macOS, a symlinked checkout — that is the same string the file's
             // own realpath gave while it existed, so the history stays found.
-            $parent = realpath(\dirname($path));
-            $resolved = false === $parent ? $path : $parent.'/'.basename($path);
+            $parent = \realpath(\dirname($path));
+            $resolved = false === $parent ? $path : $parent.'/'.\basename($path);
         }
 
-        return $this->baseDir.'/'.substr(md5($resolved), offset: 0, length: 16);
+        return $this->baseDir.'/'.\substr(\md5($resolved), offset: 0, length: 16);
     }
 }
