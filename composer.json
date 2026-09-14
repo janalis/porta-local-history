@@ -4,7 +4,7 @@
     "type": "porta-plugin",
     "license": "MIT",
     "require": {
-        "php": ">=8.4",
+        "php": ">=8.5",
         "symfony/clock": "^8.1",
         "symfony/filesystem": "^8.1"
     },
