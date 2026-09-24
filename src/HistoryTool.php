@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Porta\LocalHistory;
 
+use Porta\Overlay\State\ToastSeverity;
 use Porta\Plugin\Api\PluginApi;
 use Porta\Workbench\Dock\ToolRun;
 use Symfony\Component\Filesystem\Exception\IOExceptionInterface;
@@ -270,7 +271,7 @@ final class HistoryTool
         }
         $content = ($this->store)()->read($file);
         if (null === $content) {
-            $this->api->flash($this->api->trans('Could not read that snapshot'));
+            $this->api->notify($this->api->trans('Could not read that snapshot'), ToastSeverity::Error);
 
             return;
         }
@@ -283,7 +284,7 @@ final class HistoryTool
             try {
                 $this->fs->dumpFile($path, $content);
             } catch (IOExceptionInterface) {
-                $this->api->flash($this->api->trans('Cannot write %file%', ['%file%' => \basename($path)]));
+                $this->api->notify($this->api->trans('Cannot write %file%', ['%file%' => \basename($path)]), ToastSeverity::Error);
 
                 return;
             }
@@ -298,7 +299,7 @@ final class HistoryTool
         // at. An undo safety net that overwrites an unrelated open file is the
         // worst thing this plugin could do.
         if ($this->api->activeFile() !== $path) {
-            $this->api->flash($this->api->trans('Cannot restore %file% — it is no longer there', ['%file%' => \basename($path)]));
+            $this->api->notify($this->api->trans('Cannot restore %file% — it is no longer there', ['%file%' => \basename($path)]), ToastSeverity::Error);
 
             return;
         }
