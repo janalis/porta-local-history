@@ -6,6 +6,7 @@ namespace Porta\LocalHistory\Tests;
 
 use PHPUnit\Framework\TestCase;
 use Porta\Editor\BufferManager;
+use Porta\Editor\BufferSaver;
 use Porta\I18n\Translator;
 use Porta\LocalHistory\HistoryTool;
 use Porta\LocalHistory\SnapshotDiff;
@@ -26,6 +27,7 @@ use Porta\Tests\Support\TempProject;
 use Porta\Tests\Support\TestBottomDock;
 use Porta\Tests\Support\TestDockTools;
 use Porta\Tests\Support\TestLspQuery;
+use Porta\Tests\Support\TestRunController;
 use Porta\Tests\Support\TestTui;
 use Porta\Tree\FileStatuses;
 use Porta\Widget\CodeEditorWidget;
@@ -100,6 +102,8 @@ final class HistoryToolTest extends TestCase
             new FakePluginLifecycle(),
             new FileTreeWidget(\sys_get_temp_dir()),
             TestLspQuery::create(),
+            new BufferSaver(new BufferManager(), new EventDispatcher()),
+            TestRunController::create(),
         ));
         $api = new PluginApi('local-history', $manager, $this->project->dir, $settings);
         $api->registerListTool(HistoryTool::TOOL, 'Local History');
