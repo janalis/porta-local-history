@@ -29,6 +29,7 @@ use Porta\Tests\Support\TestDockTools;
 use Porta\Tests\Support\TestLspQuery;
 use Porta\Tests\Support\TestRunController;
 use Porta\Tests\Support\TestTui;
+use Porta\Tests\Support\TestWorkspaceEditor;
 use Porta\Tree\FileStatuses;
 use Porta\Widget\CodeEditorWidget;
 use Porta\Widget\DebugPanelWidget;
@@ -104,6 +105,7 @@ final class HistoryToolTest extends TestCase
             TestLspQuery::create(),
             new BufferSaver(new BufferManager(), new EventDispatcher()),
             TestRunController::create(),
+            TestWorkspaceEditor::create(),
         ));
         $api = new PluginApi('local-history', $manager, $this->project->dir, $settings);
         $api->registerListTool(HistoryTool::TOOL, 'Local History');
