@@ -30,10 +30,6 @@
         <source>%count% version|%count% versions</source>
         <target>%count% versión|%count% versiones</target>
       </trans-unit>
-      <trans-unit id="8">
-        <source>Recent Changes</source>
-        <target>Cambios recientes</target>
-      </trans-unit>
       <trans-unit id="9">
         <source>Cannot write %file%</source>
         <target>No se puede escribir %file%</target>
