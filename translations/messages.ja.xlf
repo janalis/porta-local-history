@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xliff xmlns="urn:oasis:names:tc:xliff:document:1.2" version="1.2">
+  <file source-language="en" target-language="ja" datatype="plaintext" original="messages">
+    <body>
+      <trans-unit id="1">
+        <source>Could not read that snapshot</source>
+        <target>そのスナップショットを読み込めませんでした</target>
+      </trans-unit>
+      <trans-unit id="2">
+        <source>No local history for this file yet</source>
+        <target>このファイルのローカル履歴はまだありません</target>
+      </trans-unit>
+      <trans-unit id="3">
+        <source>Restored from local history</source>
+        <target>ローカル履歴から復元しました</target>
+      </trans-unit>
+      <trans-unit id="4">
+        <source>%file% is gone — restoring a version will bring it back</source>
+        <target>%file% はもうありません — バージョンを復元すると元に戻ります</target>
+      </trans-unit>
+      <trans-unit id="5">
+        <source>Cannot restore %file% — it is no longer there</source>
+        <target>%file% を復元できません — ファイルがもうありません</target>
+      </trans-unit>
+      <trans-unit id="6">
+        <source>No local history yet</source>
+        <target>ローカル履歴はまだありません</target>
+      </trans-unit>
+      <trans-unit id="7">
+        <source>%count% version|%count% versions</source>
+        <target>%count% 個のバージョン|%count% 個のバージョン</target>
+      </trans-unit>
+      <trans-unit id="8">
+        <source>Recent Changes</source>
+        <target>最近の変更</target>
+      </trans-unit>
+      <trans-unit id="9">
+        <source>Cannot write %file%</source>
+        <target>%file% に書き込めません</target>
+      </trans-unit>
+      <trans-unit id="10">
+        <source>Compare with Snapshot</source>
+        <target>スナップショットと比較</target>
+      </trans-unit>
+      <trans-unit id="11">
+        <source>Comparing %file% with a snapshot</source>
+        <target>%file% をスナップショットと比較しています</target>
+      </trans-unit>
+      <trans-unit id="12">
+        <source>Comparing snapshots needs git on your PATH</source>
+        <target>スナップショットの比較には PATH 上の git が必要です</target>
+      </trans-unit>
+      <trans-unit id="13">
+        <source>That snapshot matches the file on disk</source>
+        <target>このスナップショットはディスク上のファイルと一致します</target>
+      </trans-unit>
+    </body>
+  </file>
+</xliff>

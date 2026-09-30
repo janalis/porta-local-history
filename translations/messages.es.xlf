@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xliff xmlns="urn:oasis:names:tc:xliff:document:1.2" version="1.2">
+  <file source-language="en" target-language="es" datatype="plaintext" original="messages">
+    <body>
+      <trans-unit id="1">
+        <source>Could not read that snapshot</source>
+        <target>No se pudo leer esa instantánea</target>
+      </trans-unit>
+      <trans-unit id="2">
+        <source>No local history for this file yet</source>
+        <target>Aún no hay historial local para este archivo</target>
+      </trans-unit>
+      <trans-unit id="3">
+        <source>Restored from local history</source>
+        <target>Restaurado desde el historial local</target>
+      </trans-unit>
+      <trans-unit id="4">
+        <source>%file% is gone — restoring a version will bring it back</source>
+        <target>%file% ya no existe: restaurar una versión lo recuperará</target>
+      </trans-unit>
+      <trans-unit id="5">
+        <source>Cannot restore %file% — it is no longer there</source>
+        <target>No se puede restaurar %file%: el archivo ya no existe</target>
+      </trans-unit>
+      <trans-unit id="6">
+        <source>No local history yet</source>
+        <target>Aún no hay historial local</target>
+      </trans-unit>
+      <trans-unit id="7">
+        <source>%count% version|%count% versions</source>
+        <target>%count% versión|%count% versiones</target>
+      </trans-unit>
+      <trans-unit id="8">
+        <source>Recent Changes</source>
+        <target>Cambios recientes</target>
+      </trans-unit>
+      <trans-unit id="9">
+        <source>Cannot write %file%</source>
+        <target>No se puede escribir %file%</target>
+      </trans-unit>
+      <trans-unit id="10">
+        <source>Compare with Snapshot</source>
+        <target>Comparar con instantánea</target>
+      </trans-unit>
+      <trans-unit id="11">
+        <source>Comparing %file% with a snapshot</source>
+        <target>Comparando %file% con una instantánea</target>
+      </trans-unit>
+      <trans-unit id="12">
+        <source>Comparing snapshots needs git on your PATH</source>
+        <target>Comparar instantáneas requiere git en tu PATH</target>
+      </trans-unit>
+      <trans-unit id="13">
+        <source>That snapshot matches the file on disk</source>
+        <target>Esa instantánea coincide con el archivo en disco</target>
+      </trans-unit>
+    </body>
+  </file>
+</xliff>

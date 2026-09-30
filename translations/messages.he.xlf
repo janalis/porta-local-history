@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xliff xmlns="urn:oasis:names:tc:xliff:document:1.2" version="1.2">
+  <file source-language="en" target-language="he" datatype="plaintext" original="messages">
+    <body>
+      <trans-unit id="1">
+        <source>Could not read that snapshot</source>
+        <target>לא ניתן לקרוא את התצלום</target>
+      </trans-unit>
+      <trans-unit id="2">
+        <source>No local history for this file yet</source>
+        <target>אין עדיין היסטוריה מקומית לקובץ זה</target>
+      </trans-unit>
+      <trans-unit id="3">
+        <source>Restored from local history</source>
+        <target>שוחזר מההיסטוריה המקומית</target>
+      </trans-unit>
+      <trans-unit id="4">
+        <source>%file% is gone — restoring a version will bring it back</source>
+        <target>%file% כבר לא קיים — שחזור גרסה יחזיר אותו</target>
+      </trans-unit>
+      <trans-unit id="5">
+        <source>Cannot restore %file% — it is no longer there</source>
+        <target>לא ניתן לשחזר את %file% — הקובץ כבר לא קיים</target>
+      </trans-unit>
+      <trans-unit id="6">
+        <source>No local history yet</source>
+        <target>אין עדיין היסטוריה מקומית</target>
+      </trans-unit>
+      <trans-unit id="7">
+        <source>%count% version|%count% versions</source>
+        <target>גרסה %count%|%count% גרסאות</target>
+      </trans-unit>
+      <trans-unit id="8">
+        <source>Recent Changes</source>
+        <target>שינויים אחרונים</target>
+      </trans-unit>
+      <trans-unit id="9">
+        <source>Cannot write %file%</source>
+        <target>לא ניתן לכתוב אל %file%</target>
+      </trans-unit>
+      <trans-unit id="10">
+        <source>Compare with Snapshot</source>
+        <target>השוואה עם תמונת מצב</target>
+      </trans-unit>
+      <trans-unit id="11">
+        <source>Comparing %file% with a snapshot</source>
+        <target>משווה את %file% לתמונת מצב</target>
+      </trans-unit>
+      <trans-unit id="12">
+        <source>Comparing snapshots needs git on your PATH</source>
+        <target>להשוואת תמונות מצב נדרש git בנתיב שלך</target>
+      </trans-unit>
+      <trans-unit id="13">
+        <source>That snapshot matches the file on disk</source>
+        <target>תמונת מצב זו זהה לקובץ שבדיסק</target>
+      </trans-unit>
+    </body>
+  </file>
+</xliff>
