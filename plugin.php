@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use Porta\Event\AgentEditing;
+use Porta\Event\FileDeleted;
 use Porta\Event\FileRenamed;
 use Porta\Event\PluginObservable;
 use Porta\LocalHistory\HistoryTool;
@@ -87,6 +89,19 @@ return new class('local-history') extends AbstractPlugin {
         // Snapshots are keyed by a hash of the path, so a rename orphans a
         // file's whole history unless something moves it. Core's six
         // path-keyed stores follow the same fact.
+        // A delete takes a file's text with it, and an agent's first edit
+        // replaces what the user had: both hand over the text, and both are
+        // kept, so Recent Changes brings either back.
+        $api->on(FileDeleted::class, static function (PluginObservable $event) use ($tool): void {
+            \assert($event instanceof FileDeleted, description: 'on() delivers the class it was registered for');
+            if (null !== $event->previousText) {
+                $tool->snapshotReplaced($event->path, $event->previousText);
+            }
+        });
+        $api->on(AgentEditing::class, static function (PluginObservable $event) use ($tool): void {
+            \assert($event instanceof AgentEditing, description: 'on() delivers the class it was registered for');
+            $tool->snapshotReplaced($event->path, $event->previousText);
+        });
         $api->on(FileRenamed::class, static function (PluginObservable $event) use ($tool): void {
             // Widened then narrowed, the way plugins/git does it: on() hands
             // every listener the marker type, and a closure typed to the

@@ -8,6 +8,8 @@ use PHPUnit\Framework\TestCase;
 use Porta\Config\CommandRegistry;
 use Porta\Editor\BufferService;
 use Porta\Editor\OpenFocus;
+use Porta\Event\AgentEditing;
+use Porta\Event\FileDeleted;
 use Porta\Ide;
 use Porta\LocalHistory\SnapshotStore;
 use Porta\Tests\Support\ClearsPortaLsp;
@@ -21,6 +23,7 @@ use Porta\Widget\ContextMenu;
 use Porta\Workbench\Dock\BottomDock;
 use Porta\Workbench\Menu\MenuItem;
 use Symfony\Component\Clock\NativeClock;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Tui\Ansi\AnsiUtils;
 use Symfony\Component\Tui\Render\RenderContext;
 use Symfony\Component\Tui\Render\Renderer;
@@ -148,6 +151,28 @@ final class IdeLocalHistoryPluginTest extends TestCase
         $this->assertFileExists($project->path('B.php'), 'renamed on disk');
         $this->assertCount(1, $history->list($project->path('B.php')), 'the snapshot came with the file');
         $this->assertSame([], $history->list($project->path('A.php')), 'and none is left on the old name');
+    }
+
+    public function testADeletedFileAndTheVersionBeforeAnAgentsEditAreKept(): void
+    {
+        \putenv('PATH=/nonexistent');
+        $project = self::project(['A.php' => "mine\n", 'B.php' => "other\n"]);
+        $a = (string) \realpath($project->path('A.php'));
+        $b = (string) \realpath($project->path('B.php'));
+
+        $this->runIde($project, $project->path('A.php'), [
+            300 => static function ($tui, $terminal, Ide $ide) use ($a, $b): void {
+                $events = Services::resolve($ide, EventDispatcherInterface::class);
+                $events->dispatch(new AgentEditing($a, "before the agent\n"));
+                $events->dispatch(new FileDeleted($b, "other\n"));
+                $events->dispatch(new FileDeleted($b.'-folder')); // a folder: nothing to keep
+            },
+        ]);
+
+        $history = new SnapshotStore($project->dir, new NativeClock());
+        $this->assertSame(["before the agent\n"], \array_map(static fn (array $row): ?string => $history->read($row['file']), $history->list($a)));
+        $this->assertSame(["other\n"], \array_map(static fn (array $row): ?string => $history->read($row['file']), $history->list($b)), 'restorable from Recent Changes');
+        $this->assertCount(2, $history->recent(), 'and nothing for the folder');
     }
 
     public function testCompareShowsWHATASnapshotWouldChange(): void
