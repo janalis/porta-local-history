@@ -42,6 +42,25 @@ final class SnapshotStoreTest extends TestCase
         $this->assertSame([2, 1], \array_column($recent, 'count'), 'and it has two versions');
     }
 
+    /** `.porta/` comes with a clone: a history folder that is a link is not written through, nor chmod'ed. */
+    public function testAHistoryFolderThatIsALinkIsNotWrittenThrough(): void
+    {
+        foreach (['.porta/history', '.porta'] as $linked) {
+            $elsewhere = new TempProject(['keep' => '']);
+            \chmod($elsewhere->dir, permissions: 0o755);
+            $project = new TempProject(['a.php' => "a\n", '.porta/.keep' => '']);
+            if ('.porta' === $linked) {
+                \unlink($project->path('.porta/.keep'));
+                \rmdir($project->path('.porta'));
+            }
+            \symlink($elsewhere->dir, $project->path($linked));
+
+            $this->assertSame(-1, new SnapshotStore($project->dir, $this->clock())->snapshot($project->path('a.php'), "a1\n"), $linked);
+            $this->assertSame(['keep'], \array_values(\array_diff((array) \scandir($elsewhere->dir), ['.', '..'])), $linked.': nothing written there');
+            $this->assertSame(0o755, \fileperms($elsewhere->dir) & 0o777, $linked.': nor chmod\'ed');
+        }
+    }
+
     public function testSnapshotsAreReadableByTheirOwnerOnly(): void
     {
         $project = new TempProject(['.env' => "SECRET=1\n", '.porta/history/.keep' => '']);

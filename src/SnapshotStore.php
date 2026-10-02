@@ -61,6 +61,11 @@ final readonly class SnapshotStore
     public function snapshot(string $path, string $content): int
     {
         $dir = $this->dirFor($path);
+        // `.porta/` comes with a cloned project: a history folder that is a
+        // link would have snapshots written — and its target chmod'ed — elsewhere.
+        if (\is_link($this->baseDir) || \is_link(\dirname($this->baseDir))) {
+            return -1;
+        }
         try {
             // Owner-only: a snapshot of a 0600 `.env` is as secret as the file,
             // and lands 0644 under the umask — the folder is what keeps it in.
