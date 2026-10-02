@@ -42,6 +42,15 @@ final class SnapshotStoreTest extends TestCase
         $this->assertSame([2, 1], \array_column($recent, 'count'), 'and it has two versions');
     }
 
+    public function testSnapshotsAreReadableByTheirOwnerOnly(): void
+    {
+        $project = new TempProject(['.env' => "SECRET=1\n", '.porta/history/.keep' => '']);
+        \chmod($project->path('.porta/history'), permissions: 0o755); // as a history made before this was
+        new SnapshotStore($project->dir, $this->clock())->snapshot($project->path('.env'), "SECRET=1\n");
+
+        $this->assertSame(0o700, \fileperms($project->path('.porta/history')) & 0o777);
+    }
+
     /**
      * A directory written before the sidecar existed is SKIPPED, not listed as
      * a hash: a row nobody can act on is worse than no row, and the next save

@@ -62,7 +62,11 @@ final readonly class SnapshotStore
     {
         $dir = $this->dirFor($path);
         try {
-            $this->fs->mkdir($dir);
+            // Owner-only: a snapshot of a 0600 `.env` is as secret as the file,
+            // and lands 0644 under the umask — the folder is what keeps it in.
+            // Tightened on every save, for a history made before this was so.
+            $this->fs->mkdir($dir, mode: 0o700);
+            $this->fs->chmod($this->baseDir, mode: 0o700);
         } catch (IOExceptionInterface) {
             return -1;
         }
