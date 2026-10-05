@@ -117,6 +117,25 @@ final class SnapshotStoreTest extends TestCase
     }
 
     /**
+     * A directory named all in digits — one in two thousand md5 prefixes,
+     * or a stray `2024` — is an INT key once PHP indexes an array by it, and
+     * handing that key to a `string` parameter is a TypeError under strict
+     * types: `recent()` threw, every time, because the marker that would have
+     * stopped the rescan was the write that threw.
+     */
+    public function testAnAllDigitDirectoryIsMarkedLikeAnyOther(): void
+    {
+        $project = new TempProject(['a.php' => "a\n"]);
+        $history = new SnapshotStore($project->dir, $this->clock());
+        $history->snapshot($project->path('a.php'), "a1\n");
+        $digits = $project->path('.porta/history/1234567890123456');
+        \mkdir($digits);
+
+        $this->assertSame([$project->path('a.php')], \array_column($history->recent(), 'path'));
+        $this->assertSame('', (string) \file_get_contents($digits.'/path'), 'scanned, and known to be unnameable');
+    }
+
+    /**
      * A project too big to hash is not walked forever: the scan stops at its
      * bound and marks what it did not reach, so the cost is paid once whether
      * or not it succeeded. The next save on any of those names it properly.

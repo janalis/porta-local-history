@@ -258,7 +258,9 @@ final readonly class SnapshotStore
             if (\str_starts_with($name, '.') || !\is_dir($this->baseDir.'/'.$name) || \is_file($this->baseDir.'/'.$name.'/'.self::PATH_FILE)) {
                 continue;
             }
-            $wanted[$name] = true;
+            // Keyed by name, as a STRING: an all-digit name would become an
+            // int key, and an int is a TypeError at writeSidecar(string).
+            $wanted[$name] = $name;
         }
         if ([] === $wanted || !\is_dir($this->rootDir)) {
             return;
@@ -296,7 +298,7 @@ final readonly class SnapshotStore
         // land here are pre-sidecar directories whose file has since been
         // deleted or moved out, which nothing could name anyway, and the next
         // save on any of them writes the real name over the marker.
-        foreach (\array_keys($wanted) as $hash) {
+        foreach ($wanted as $hash) {
             $this->writeSidecar($hash, '');
         }
     }
