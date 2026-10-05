@@ -19,7 +19,9 @@ use Porta\Tests\Support\RunsIde;
 use Porta\Tests\Support\Services;
 use Porta\Tests\Support\TempProject;
 use Porta\Tests\Support\UsesBundledPlugins;
+use Porta\Tests\Support\Widgets;
 use Porta\Widget\ContextMenu;
+use Porta\Widget\FileTreeWidget;
 use Porta\Workbench\Dock\BottomDock;
 use Porta\Workbench\Menu\MenuItem;
 use Symfony\Component\Clock\NativeClock;
@@ -58,15 +60,15 @@ final class IdeLocalHistoryPluginTest extends TestCase
             $project,
             $project->path('A.php'),
             [
-                300 => static function ($tui): void {
+                300 => static function (Tui $tui): void {
                     // Edit and save → first snapshot; edit and save → second.
-                    $d = $tui->getById('editor')->getDocument();
+                    $d = Widgets::editor($tui)->getDocument();
                     $d->selectAll();
                     $d->insert("version two\n");
                     $tui->handleInput("\x13"); // ctrl+s
                 },
-                450 => static function ($tui): void {
-                    $d = $tui->getById('editor')->getDocument();
+                450 => static function (Tui $tui): void {
+                    $d = Widgets::editor($tui)->getDocument();
                     $d->selectAll();
                     $d->insert("version three\n");
                     $tui->handleInput("\x13");
@@ -82,12 +84,12 @@ final class IdeLocalHistoryPluginTest extends TestCase
                 750 => function (Tui $tui, VirtualTerminal $terminal): void {
                     $this->awaitPainted($tui, $terminal, 'Restored from local history');
                     $this->assertStringContainsString('Restored from local history', AnsiUtils::stripAnsiCodes($terminal->getOutput()));
-                    $this->assertStringContainsString('version two', $tui->getById('editor')->getDocument()->getText());
+                    $this->assertStringContainsString('version two', Widgets::editor($tui)->getDocument()->getText());
 
                     // The whole reason this needed a core verb rather than the
                     // disk-rewrite dodge: one Ctrl+Z, back to what was on screen.
-                    $tui->getById('editor')->handleInput("\x1a");
-                    $this->assertStringContainsString('version three', $tui->getById('editor')->getDocument()->getText());
+                    Widgets::editor($tui)->handleInput("\x1a");
+                    $this->assertStringContainsString('version three', Widgets::editor($tui)->getDocument()->getText());
                 },
             ],
         );
@@ -109,8 +111,8 @@ final class IdeLocalHistoryPluginTest extends TestCase
             $project,
             $project->path('A.php'),
             [
-                300 => static function ($tui): void {
-                    $d = $tui->getById('editor')->getDocument();
+                300 => static function (Tui $tui): void {
+                    $d = Widgets::editor($tui)->getDocument();
                     $d->selectAll();
                     $d->insert("version two\n");
                     $tui->handleInput("\x13"); // ctrl+s → a snapshot of version one
@@ -191,14 +193,14 @@ final class IdeLocalHistoryPluginTest extends TestCase
             $project,
             $project->path('A.php'),
             [
-                300 => static function ($tui): void {
-                    $d = $tui->getById('editor')->getDocument();
+                300 => static function (Tui $tui): void {
+                    $d = Widgets::editor($tui)->getDocument();
                     $d->selectAll();
                     $d->insert("alpha\nbeta\ngamma\n");
                     $tui->handleInput("\x13"); // ctrl+s → the older snapshot
                 },
-                450 => static function ($tui): void {
-                    $d = $tui->getById('editor')->getDocument();
+                450 => static function (Tui $tui): void {
+                    $d = Widgets::editor($tui)->getDocument();
                     $d->selectAll();
                     $d->insert("alpha\nBETA\ngamma\ndelta\n");
                     $tui->handleInput("\x13"); // ctrl+s → the newer one, matching disk
@@ -271,8 +273,8 @@ final class IdeLocalHistoryPluginTest extends TestCase
             $project,
             $project->path('A.php'),
             [
-                300 => static function ($tui): void {
-                    $d = $tui->getById('editor')->getDocument();
+                300 => static function (Tui $tui): void {
+                    $d = Widgets::editor($tui)->getDocument();
                     $d->selectAll();
                     $d->insert("a two\n");
                     $tui->handleInput("\x13"); // save → snapshot of "a one"... and "a two"
@@ -289,7 +291,7 @@ final class IdeLocalHistoryPluginTest extends TestCase
                 },
                 700 => function (Tui $tui) use ($project): void {
                     $this->frame($tui);
-                    $this->assertStringEndsWith('/A.php', (string) $tui->getById('editor')->getFilePath(), 'the listed file was re-opened');
+                    $this->assertStringEndsWith('/A.php', (string) Widgets::editor($tui)->getFilePath(), 'the listed file was re-opened');
                     $this->assertSame("b untouched\n", (string) \file_get_contents($project->path('B.php')), 'B was never written');
                 },
             ],
@@ -315,7 +317,7 @@ final class IdeLocalHistoryPluginTest extends TestCase
 
                     $dock = Services::resolve($ide, BottomDock::class);
                     $this->assertNull($dock->visiblePanel(), 'no panel opened');
-                    $this->assertDirectoryDoesNotExist($tui->getById('editor')->getFilePath().'/../.porta/history', 'and nothing was snapshotted');
+                    $this->assertDirectoryDoesNotExist(Widgets::editor($tui)->getFilePath().'/../.porta/history', 'and nothing was snapshotted');
                 },
             ],
         );
@@ -337,7 +339,7 @@ final class IdeLocalHistoryPluginTest extends TestCase
     /** The tree row index whose rendered text names $file. */
     private function treeRowOf(mixed $tui, mixed $ide, string $file): int
     {
-        $tree = $tui->getById('tree');
+        $tree = Widgets::byId($tui, 'tree', FileTreeWidget::class);
         $rect = Services::resolve($ide, Renderer::class)->getWidgetRect($tree);
         foreach ($tree->render(new RenderContext($rect->columns, $rect->rows)) as $i => $line) {
             if (\str_contains(AnsiUtils::stripAnsiCodes($line), $file)) {
@@ -431,7 +433,7 @@ final class IdeLocalHistoryPluginTest extends TestCase
                     // have flashed "No local history for this file yet" and
                     // opened nothing.
                     $this->await(static fn (): bool => null !== Services::resolve($ide, BottomDock::class)->visiblePanel(), what: "other.php's history list");
-                    $this->assertSame('a.php', \basename((string) $tui->getById('editor')->getFilePath()), 'and the active tab never changed');
+                    $this->assertSame('a.php', \basename((string) Widgets::editor($tui)->getFilePath()), 'and the active tab never changed');
                 },
             ],
         );
