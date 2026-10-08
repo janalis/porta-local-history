@@ -447,7 +447,7 @@ final class HistoryToolTest extends TestCase
 
         $tool->snapshot($path);
         $this->buffers->active()->document->insert(' v2');
-        \file_put_contents($path, (string) $this->buffers->active()?->document->getText());
+        \file_put_contents($path, $this->buffers->active()?->document->getText());
         $this->clock->sleep(1);
         $tool->snapshot($path);
 
