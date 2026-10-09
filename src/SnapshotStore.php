@@ -61,18 +61,7 @@ final readonly class SnapshotStore
     public function snapshot(string $path, string $content): int
     {
         $dir = $this->dirFor($path);
-        // `.porta/` comes with a cloned project: a history folder that is a
-        // link would have snapshots written — and its target chmod'ed — elsewhere.
-        if (\is_link($this->baseDir) || \is_link(\dirname($this->baseDir))) {
-            return -1;
-        }
-        try {
-            // Owner-only: a snapshot of a 0600 `.env` is as secret as the file,
-            // and lands 0644 under the umask — the folder is what keeps it in.
-            // Tightened on every save, for a history made before this was so.
-            $this->fs->mkdir($dir, mode: 0o700);
-            $this->fs->chmod($this->baseDir, mode: 0o700);
-        } catch (IOExceptionInterface) {
+        if (!$this->prepareDir($dir)) {
             return -1;
         }
 
@@ -82,10 +71,41 @@ final readonly class SnapshotStore
         // snapshot back just to learn that.
         $existing = $this->list($path);
         $newest = $existing[0]['file'] ?? null;
-        if (null !== $newest && \is_file($newest) && \filesize($newest) === \strlen($content) && \file_get_contents($newest) === $content) {
-            return 0;
+
+        return null !== $newest && \is_file($newest) && \filesize($newest) === \strlen($content) && \file_get_contents($newest) === $content
+            ? 0
+            : $this->record($path, $dir, $content, $existing);
+    }
+
+    /** Make the snapshot folder $dir, owner-only; false when it cannot (or must not) be. */
+    private function prepareDir(string $dir): bool
+    {
+        // `.porta/` comes with a cloned project: a history folder that is a
+        // link would have snapshots written — and its target chmod'ed — elsewhere.
+        $ready = !\is_link($this->baseDir) && !\is_link(\dirname($this->baseDir));
+        try {
+            if ($ready) {
+                // Owner-only: a snapshot of a 0600 `.env` is as secret as the file,
+                // and lands 0644 under the umask — the folder is what keeps it in.
+                // Tightened on every save, for a history made before this was so.
+                $this->fs->mkdir($dir, mode: 0o700);
+                $this->fs->chmod($this->baseDir, mode: 0o700);
+            }
+        } catch (IOExceptionInterface) {
+            $ready = false;
         }
 
+        return $ready;
+    }
+
+    /**
+     * Write a new snapshot of $content beside $existing, then prune: the
+     * pruned count, or -1 when it could not be written.
+     *
+     * @param list<array{stamp: int, file: string}> $existing
+     */
+    private function record(string $path, string $dir, string $content, array $existing): int
+    {
         $stamp = (int) $this->clock->now()->format('Uv');
         $file = $dir.'/'.$stamp.'.snap';
         try {

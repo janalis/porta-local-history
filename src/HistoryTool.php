@@ -218,6 +218,12 @@ final class HistoryTool
             return;
         }
 
+        $this->pickToCompare($path, $differ);
+    }
+
+    /** Offer $path's snapshots; the picked one is diffed against the file by $differ. */
+    private function pickToCompare(string $path, SnapshotDiff $differ): void
+    {
         $snapshots = ($this->store)()->list($path);
         if ([] === $snapshots) {
             $this->api->flash($this->api->trans('No local history for this file yet'));
@@ -275,19 +281,18 @@ final class HistoryTool
 
             return;
         }
+        $this->restoreInto($path, $content);
+    }
+
+    private function restoreInto(string $path, string $content): void
+    {
         // A file that is GONE is recreated from the snapshot rather than
         // refused. `replaceDocument()` never touches disk because a file that
         // exists is the user's to keep — but there is nothing here to keep, no
         // buffer to replace, and this copy is the last one anywhere. Core does
         // the same for a scratch file: mint it on disk, then open it.
-        if (!\is_file($path)) {
-            try {
-                $this->fs->dumpFile($path, $content);
-            } catch (IOExceptionInterface) {
-                $this->api->notify($this->api->trans('Cannot write %file%', ['%file%' => \basename($path)]), ToastSeverity::Error);
-
-                return;
-            }
+        if (!\is_file($path) && !$this->recreate($path, $content)) {
+            return;
         }
         if ($this->api->activeFile() !== $path) {
             $this->api->openFile($path);
@@ -305,5 +310,19 @@ final class HistoryTool
         }
         $this->api->replaceDocument($content);
         $this->api->flash($this->api->trans('Restored from local history'));
+    }
+
+    /** Write $content to the vanished $path; false (and said so) when it cannot be. */
+    private function recreate(string $path, string $content): bool
+    {
+        try {
+            $this->fs->dumpFile($path, $content);
+        } catch (IOExceptionInterface) {
+            $this->api->notify($this->api->trans('Cannot write %file%', ['%file%' => \basename($path)]), ToastSeverity::Error);
+
+            return false;
+        }
+
+        return true;
     }
 }
