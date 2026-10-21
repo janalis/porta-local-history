@@ -12,5 +12,22 @@
         "psr-4": {
             "Porta\\LocalHistory\\": "src/"
         }
+    },
+    "extra": {
+        "porta": {
+            "tools": [
+                {
+                    "name": "git",
+                    "role": "suggested",
+                    "purpose": "diffs between snapshots",
+                    "sources": [
+                        [
+                            "brew",
+                            "git"
+                        ]
+                    ]
+                }
+            ]
+        }
     }
 }
