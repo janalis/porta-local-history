@@ -11,7 +11,6 @@ use Porta\I18n\Translator;
 use Porta\LocalHistory\HistoryTool;
 use Porta\LocalHistory\SnapshotDiff;
 use Porta\LocalHistory\SnapshotStore;
-use Porta\Plugin\Api\PluginApi;
 use Porta\Plugin\Runtime\PluginManager;
 use Porta\Plugin\Runtime\PluginRuntime;
 use Porta\Plugin\Runtime\PluginSettings;
@@ -111,7 +110,7 @@ final class HistoryToolTest extends TestCase
             TestParticipants::create(),
             TestProjectSwitcher::create(),
         ));
-        $api = new PluginApi('local-history', $manager, $this->project->dir, $settings);
+        $api = $manager->api('local-history', $this->project->dir, $settings);
         $api->registerListTool(HistoryTool::TOOL, 'Local History');
         $api->registerListTool(HistoryTool::RECENT_TOOL, 'Recent Changes');
         $manager->commit($api);
