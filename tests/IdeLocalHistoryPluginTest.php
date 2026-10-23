@@ -93,8 +93,6 @@ final class IdeLocalHistoryPluginTest extends TestCase
                 },
             ],
         );
-
-        $this->addToAssertionCount(1);
     }
 
     public function testHISTORYFollowsTheFileWhenItIsRenamed(): void
@@ -236,8 +234,6 @@ final class IdeLocalHistoryPluginTest extends TestCase
                 },
             ],
         );
-
-        $this->addToAssertionCount(1);
     }
 
     public function testWithNoSnapshotsItSaysSoInsteadOfOpeningAnEmptyTab(): void
@@ -258,8 +254,6 @@ final class IdeLocalHistoryPluginTest extends TestCase
                 },
             ],
         );
-
-        $this->addToAssertionCount(1);
     }
 
     public function testEnterRestoresIntoTheListedFileNotWhicheverTabIsActive(): void
@@ -296,8 +290,6 @@ final class IdeLocalHistoryPluginTest extends TestCase
                 },
             ],
         );
-
-        $this->addToAssertionCount(1);
     }
 
     public function testDisablingThePluginTakesTheFeatureWithIt(): void
@@ -321,8 +313,6 @@ final class IdeLocalHistoryPluginTest extends TestCase
                 },
             ],
         );
-
-        $this->addToAssertionCount(1);
     }
 
     /** The context menu's labels, as one string. */
@@ -386,8 +376,6 @@ final class IdeLocalHistoryPluginTest extends TestCase
                 },
             ],
         );
-
-        $this->addToAssertionCount(1);
     }
 
     public function testATreeRowShowsTheHistoryOfTheFileYouClicked(): void
@@ -437,7 +425,5 @@ final class IdeLocalHistoryPluginTest extends TestCase
                 },
             ],
         );
-
-        $this->addToAssertionCount(1);
     }
 }
