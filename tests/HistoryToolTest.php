@@ -7,6 +7,8 @@ namespace Porta\LocalHistory\Tests;
 use PHPUnit\Framework\TestCase;
 use Porta\Editor\BufferManager;
 use Porta\Editor\BufferSaver;
+use Porta\Editor\FileOpener;
+use Porta\Editor\OpenFocus;
 use Porta\I18n\Translator;
 use Porta\LocalHistory\HistoryTool;
 use Porta\LocalHistory\SnapshotDiff;
@@ -72,6 +74,11 @@ final class HistoryToolTest extends TestCase
     /** Set before {@see tool()} by the test that needs the recreate write to fail. */
     private ?Filesystem $fs = null;
 
+    /** Set before {@see tool()} by the test that needs an open to take effect; else a recorder. */
+    private ?FileOpener $files = null;
+
+    private RecordingFileOpener $opener;
+
     private function tool(): HistoryTool
     {
         $this->project = new TempProject(['a.php' => "one\n"]);
@@ -86,7 +93,7 @@ final class HistoryToolTest extends TestCase
             new Notifier($this->status, $tui),
             new Translator('en'),
             new CodeEditorWidget(),
-            new RecordingFileOpener(),
+            $this->files ?? ($this->opener = new RecordingFileOpener()),
             $tui,
             new RecordingDiagnosticsSink(),
             new CodeEditorWidget()->decorations,
@@ -198,6 +205,9 @@ final class HistoryToolTest extends TestCase
         // A real location, unlike the per-file tool's rows: Enter takes core's
         // open-and-jump, and line 1 is where opening a file puts you.
         $this->assertStringContainsString(':1', $rows[0] ?? '');
+        // The row's own words, exactly: the moment to the second, two spaces, the count.
+        $when = \date('Y-m-d H:i:s', $this->clock->now()->getTimestamp());
+        $this->assertStringContainsString($when.'  1 version', $rows[0] ?? '');
     }
 
     /** And more than one is. */
@@ -303,6 +313,38 @@ final class HistoryToolTest extends TestCase
     }
 
     /**
+     * The whole of it, through an opener that opens: the recreated file ends up
+     * on screen holding the version that was picked, and says so. (The rig's
+     * recording opener cannot tell a restore from a recreate that stopped
+     * halfway: both leave the file on disk and another buffer active.)
+     */
+    public function testARestoredDeletedFileIsOpenHoldingThePickedVersion(): void
+    {
+        $buffers = null;
+        $this->files = new class($buffers) implements FileOpener {
+            public function __construct(
+                private ?BufferManager &$buffers,
+            ) {}
+
+            #[\Override]
+            public function openFile(string $path, OpenFocus $focus = OpenFocus::Keep): void
+            {
+                \assert(null !== $this->buffers, description: 'the rig hands its buffers in before anything is opened');
+                $this->buffers->open($path, (string) \file_get_contents($path));
+                $this->buffers->setActive($path);
+            }
+        };
+        $tool = $this->tool();
+        $gone = $this->listedThenDeleted($tool);
+
+        $tool->restore(0);
+
+        $this->assertSame($gone, $this->buffers->active()?->path, 'the recreated file is the one on screen');
+        $this->assertSame("one\n", $this->buffers->active()->document->getText());
+        $this->assertStringContainsString('Restored from local history', $this->flashText($this->status));
+    }
+
+    /**
      * The listed file cannot be recreated. `restore()` ends in
      * `replaceDocument()`, which replaces whatever is ACTIVE — so giving up
      * has to mean giving up, not falling through into the buffer on screen.
@@ -384,12 +426,17 @@ final class HistoryToolTest extends TestCase
     {
         $tool = $this->tool();
         $gone = $this->listedThenDeleted($tool);
+        // Away from that file's list first: it is already on the panel from
+        // the setup, and seeing it there would prove nothing.
+        $tool->showRecent();
+        $this->assertStringNotContainsString('latest', $this->panel());
 
         $tool->openOrShowHistory('a.php', 0);
 
         $this->assertStringContainsString('is gone', $this->flashText($this->status));
         $this->assertStringContainsString('a.php  ', $this->panel(), 'and the panel names the file it is about — nothing else on screen does');
         $this->assertStringContainsString('latest', $this->panel(), 'and lists that file\'s snapshots');
+        $this->assertStringContainsString(\date('Y-m-d H:i:s', $this->clock->now()->getTimestamp()), $this->panel(), 'each to the second it was taken');
         $this->assertFileDoesNotExist($gone, 'looking is not restoring');
     }
 
@@ -399,6 +446,7 @@ final class HistoryToolTest extends TestCase
         $tool = $this->tool();
         $tool->openOrShowHistory('a.php', 0);
 
+        $this->assertSame([$this->project->path('a.php')], \array_column($this->opener->opened, 'path'), 'it is opened');
         $this->assertStringNotContainsString('is gone', $this->flashText($this->status));
     }
 

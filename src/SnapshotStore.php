@@ -29,8 +29,13 @@ final readonly class SnapshotStore
      */
     private const string PATH_FILE = 'path';
 
-    /** Trees never worth hashing: nobody's local history is in one, and they hold most of the files. */
-    private const array SKIP_DIRS = ['.git', 'vendor', 'node_modules', '.idea', '.phpunit.cache'];
+    /**
+     * Trees never worth hashing: nobody's local history is in one, and they
+     * hold most of the files. `.porta` is the store itself — 25 snapshots a
+     * file — whose walk would spend the scan's bound on its own snapshots
+     * before reaching a single file they could belong to.
+     */
+    private const array SKIP_DIRS = ['.git', 'vendor', 'node_modules', '.idea', '.phpunit.cache', '.porta'];
 
     private string $baseDir;
     private string $rootDir;

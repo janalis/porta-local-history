@@ -114,6 +114,33 @@ final class SnapshotStoreTest extends TestCase
 
         $this->assertSame([], $history->recent());
         $this->assertSame('', (string) \file_get_contents($dir.'/path'), 'scanned, and known to be unnameable');
+        $this->assertFileDoesNotExist($project->path('.porta/history/path'), 'the store\'s own listing (. and ..) is never taken for a history');
+    }
+
+    /** The walk goes down into the project, not only along its top. */
+    public function testAHistoryForAFileInASubdirectoryIsNamedToo(): void
+    {
+        $project = new TempProject(['src/deep/a.php' => "a\n"]);
+        $history = new SnapshotStore($project->dir, $this->clock());
+        $history->snapshot($project->path('src/deep/a.php'), "a1\n");
+        \unlink(\dirname((string) $history->list($project->path('src/deep/a.php'))[0]['file']).'/path');
+
+        $this->assertSame([$project->path('src/deep/a.php')], \array_column($history->recent(), 'path'));
+    }
+
+    /**
+     * The bound counts the files the walk REACHES, the first included. With
+     * the store itself out of the walk, a one-file project is one file: a
+     * bound of one names it.
+     */
+    public function testABoundOfOneHashesTheOneFileThere(): void
+    {
+        $project = new TempProject(['a.php' => "a\n"]);
+        $history = new SnapshotStore($project->dir, $this->clock(), scanLimit: 1);
+        $history->snapshot($project->path('a.php'), "a1\n");
+        \unlink(\dirname((string) $history->list($project->path('a.php'))[0]['file']).'/path');
+
+        $this->assertSame([$project->path('a.php')], \array_column($history->recent(), 'path'));
     }
 
     /**
@@ -276,7 +303,7 @@ final class SnapshotStoreTest extends TestCase
         $path = $project->path('a.php');
 
         $history->snapshot($path, 'same');
-        $history->snapshot($path, 'same'); // no-op
+        $this->assertSame(0, $history->snapshot($path, 'same'), 'a no-op prunes nothing — and is no failure, which would read as -1');
         $this->assertCount(1, $history->list($path));
     }
 
@@ -414,9 +441,11 @@ final class SnapshotStoreTest extends TestCase
         $history->snapshot($to, "resident\n");
         $clock->sleep(1);
         $history->snapshot($from, "moved\n");
+        $oldDir = \dirname((string) $history->list($from)[0]['file']);
         \rename($from, $to);
 
         $history->rename($from, $to);
+        $this->assertDirectoryDoesNotExist($oldDir, 'the emptied history goes, sidecar and all — it would name a file that is not there');
 
         $contents = \array_map($history->read(...), \array_column($history->list($to), 'file'));
         $this->assertSame(["moved\n", "resident\n"], $contents, 'newest first, and neither set was dropped');
