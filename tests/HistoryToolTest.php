@@ -320,18 +320,19 @@ final class HistoryToolTest extends TestCase
      */
     public function testARestoredDeletedFileIsOpenHoldingThePickedVersion(): void
     {
-        $buffers = null;
-        $this->files = new class($buffers) implements FileOpener {
+        // The buffers are the rig's, built inside tool(): asked for at the open.
+        $this->files = new readonly class(fn (): BufferManager => $this->buffers) implements FileOpener {
+            /** @param \Closure(): BufferManager $buffers */
             public function __construct(
-                private ?BufferManager &$buffers,
+                private \Closure $buffers,
             ) {}
 
             #[\Override]
             public function openFile(string $path, OpenFocus $focus = OpenFocus::Keep): void
             {
-                \assert(null !== $this->buffers, description: 'the rig hands its buffers in before anything is opened');
-                $this->buffers->open($path, (string) \file_get_contents($path));
-                $this->buffers->setActive($path);
+                $buffers = ($this->buffers)();
+                $buffers->open($path, (string) \file_get_contents($path));
+                $buffers->setActive($path);
             }
         };
         $tool = $this->tool();
