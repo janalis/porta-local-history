@@ -53,10 +53,17 @@ final readonly class SnapshotDiff
             return false;
         }
 
+        // Two files' bytes, and nothing of the repository they sit in: inside
+        // one, git still reads its config and `.git/info/attributes`, and runs
+        // the filter, textconv and external diff they name — the project's
+        // own programs, on opening a panel. A GIT_DIR that is no repository
+        // keeps it out; the flags keep the user's own drivers from rewriting
+        // what is compared, and the output from being anything but a diff.
         return new AsyncProcess(
-            [$binary, 'diff', '--no-index', '--unified=3', '--', $snapshot, $current],
+            [$binary, 'diff', '--no-index', '--no-ext-diff', '--no-textconv', '--unified=3', '--', $snapshot, $current],
             $this->cwd,
             timeout: self::TIMEOUT,
+            env: [...\getenv(), 'GIT_DIR' => '/nonexistent'],
         )->start(static function (int $code, string $stdout) use ($onDone): void {
             // Exit 1 means "they differ", which is the interesting case; 0
             // means identical. Anything else is a real failure and reads as no

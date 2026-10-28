@@ -9,6 +9,7 @@ use Porta\LocalHistory\SnapshotDiff;
 use Porta\Tests\Support\PreservesPath;
 use Porta\Tests\Support\PumpsLoop;
 use Porta\Tests\Support\TempProject;
+use Symfony\Component\Process\Process;
 
 /**
  * `git diff --no-index` against two real files. Nothing here computes a diff —
@@ -78,6 +79,43 @@ final class SnapshotDiffTest extends TestCase
         [$lines] = $this->diff($differ, $project->path('gone.txt'), $project->path('one.txt'));
 
         $this->assertSame([], $lines);
+    }
+
+    /**
+     * In a repository whose config names a filter and a textconv for the file
+     * (`.git/info/attributes`), and an external diff: none of them runs, and
+     * the body is the bytes' own diff. The control is the same diff by plain
+     * git, which runs them.
+     */
+    public function testTheRepositoryItSitsInHasNoSay(): void
+    {
+        $project = new TempProject(['old.txt' => "a\n", 'new.txt' => "b\n", 'hook.sh' => "#!/bin/sh\ntouch \"\$(dirname \"\$0\")/ran-\$\$\"\ncat\n"]);
+        \chmod($project->path('hook.sh'), permissions: 0o755);
+        $project->initGit();
+        $project->write('.git/info/attributes', "*.txt filter=x diff=x\n");
+        foreach (['filter.x.clean', 'diff.x.textconv', 'diff.external'] as $key) {
+            $project->git('config', $key, $project->path('hook.sh'));
+        }
+
+        // and the user's own: an external diff and a textconv in their global config
+        $project->write('home/attributes', "*.txt diff=y\n");
+        $project->write('home/.gitconfig', \sprintf(
+            "[core]\n\tattributesFile = %s\n[diff]\n\texternal = %2\$s\n[diff \"y\"]\n\ttextconv = %2\$s\n",
+            $project->path('home/attributes'),
+            $project->path('hook.sh'),
+        ));
+        \putenv('GIT_CONFIG_GLOBAL='.$project->path('home/.gitconfig'));
+        try {
+            [$lines] = $this->diff(new SnapshotDiff($project->dir), $project->path('old.txt'), $project->path('new.txt'));
+        } finally {
+            \putenv('GIT_CONFIG_GLOBAL');
+        }
+
+        $this->assertSame([], \glob($project->path('ran-*')), 'nothing either names ran');
+        $this->assertSame(['@@ -1 +1 @@', '-a', '+b'], $lines);
+
+        new Process(['git', 'diff', '--no-index', '--', 'old.txt', 'new.txt'], $project->dir, ['PATH' => (string) \PORTA_TEST_PRISTINE_PATH])->run();
+        $this->assertNotSame([], \glob($project->path('ran-*')), 'where plain git, in that repository, runs them');
     }
 
     public function testWithNoGitOnPATHItRefusesToStart(): void
