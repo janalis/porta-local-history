@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Porta\LocalHistory;
 
+use Porta\Support\Files;
 use Psr\Clock\ClockInterface;
 use Symfony\Component\Filesystem\Exception\IOExceptionInterface;
 use Symfony\Component\Filesystem\Filesystem;
@@ -86,8 +87,9 @@ final readonly class SnapshotStore
     private function prepareDir(string $dir): bool
     {
         // `.porta/` comes with a cloned project: a history folder that is a
-        // link would have snapshots written — and its target chmod'ed — elsewhere.
-        $ready = !\is_link($this->baseDir) && !\is_link(\dirname($this->baseDir));
+        // link, or a file's folder in it, would have snapshots and the name
+        // beside them written — and the target chmod'ed — elsewhere.
+        $ready = !Files::throughLink($this->rootDir, $dir.'/'.self::PATH_FILE);
         try {
             if ($ready) {
                 // Owner-only: a snapshot of a 0600 `.env` is as secret as the file,
@@ -211,10 +213,10 @@ final readonly class SnapshotStore
     public function rename(string $from, string $to): void
     {
         $old = $this->dirFor($from);
-        if (!\is_dir($old)) {
+        $new = $this->dirFor($to);
+        if (!\is_dir($old) || Files::throughLink($this->rootDir, $new.'/'.self::PATH_FILE)) {
             return;
         }
-        $new = $this->dirFor($to);
         try {
             if (!\is_dir($new)) {
                 $this->fs->rename($old, $new);
@@ -331,6 +333,9 @@ final readonly class SnapshotStore
     /** An unwritable store is the next save's problem, not this view's. */
     private function writeSidecar(string $hash, string $path): void
     {
+        if (Files::throughLink($this->rootDir, $this->baseDir.'/'.$hash.'/'.self::PATH_FILE)) {
+            return;
+        }
         try {
             $this->fs->dumpFile($this->baseDir.'/'.$hash.'/'.self::PATH_FILE, $path);
 

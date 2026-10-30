@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Porta\LocalHistory\Tests;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Porta\LocalHistory\SnapshotStore;
 use Porta\Tests\Support\Probe;
@@ -59,6 +60,40 @@ final class SnapshotStoreTest extends TestCase
             $this->assertSame(['keep'], \array_values(\array_diff((array) \scandir($elsewhere->dir), ['.', '..'])), $linked.': nothing written there');
             $this->assertSame(0o755, \fileperms($elsewhere->dir) & 0o777, $linked.': nor chmod\'ed');
         }
+    }
+
+    /**
+     * A file's own folder, `md5(path)`, can come linked with the clone too —
+     * and every write there names the file it holds: the snapshot, a rename's
+     * new home, an orphan's sidecar.
+     *
+     * @param \Closure(SnapshotStore, TempProject): mixed $write
+     */
+    #[DataProvider('writesIntoAFilesFolder')]
+    public function testAFilesFolderThatIsALinkIsNotWrittenThrough(\Closure $write): void
+    {
+        $elsewhere = new TempProject(['keep' => '']);
+        $project = new TempProject(['a.php' => "a\n", 'b.php' => "b\n", '.porta/history/.keep' => '']);
+        $history = new SnapshotStore($project->dir, $this->clock());
+        $history->snapshot($project->path('a.php'), "a1\n");
+        foreach (['a.php', 'b.php'] as $file) {
+            $folder = $project->path('.porta/history/'.\substr(\md5((string) \realpath($project->path($file))), offset: 0, length: 16));
+            if (!\is_dir($folder)) {
+                \symlink($elsewhere->dir, $folder);
+            }
+        }
+
+        $write($history, $project);
+
+        $this->assertSame(['keep'], \array_values(\array_diff((array) \scandir($elsewhere->dir), ['.', '..'])));
+    }
+
+    /** @return iterable<string, array{\Closure(SnapshotStore, TempProject): mixed}> */
+    public static function writesIntoAFilesFolder(): iterable
+    {
+        yield 'a snapshot' => [static fn (SnapshotStore $history, TempProject $project): int => $history->snapshot($project->path('b.php'), "b1\n")];
+        yield 'a rename onto it' => [static fn (SnapshotStore $history, TempProject $project) => $history->rename($project->path('a.php'), $project->path('b.php'))];
+        yield 'naming an orphan' => [static fn (SnapshotStore $history): array => $history->recent()];
     }
 
     public function testSnapshotsAreReadableByTheirOwnerOnly(): void
