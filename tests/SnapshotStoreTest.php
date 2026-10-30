@@ -92,6 +92,7 @@ final class SnapshotStoreTest extends TestCase
     public static function writesIntoAFilesFolder(): iterable
     {
         yield 'a snapshot' => [static fn (SnapshotStore $history, TempProject $project): int => $history->snapshot($project->path('b.php'), "b1\n")];
+        yield 'a rename of it' => [static fn (SnapshotStore $history, TempProject $project) => $history->rename($project->path('b.php'), $project->path('c.php'))];
         yield 'a rename onto it' => [static fn (SnapshotStore $history, TempProject $project) => $history->rename($project->path('a.php'), $project->path('b.php'))];
         yield 'naming an orphan' => [static fn (SnapshotStore $history): array => $history->recent()];
     }

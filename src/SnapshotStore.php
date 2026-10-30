@@ -214,7 +214,8 @@ final readonly class SnapshotStore
     {
         $old = $this->dirFor($from);
         $new = $this->dirFor($to);
-        if (!\is_dir($old) || Files::throughLink($this->rootDir, $new.'/'.self::PATH_FILE)) {
+        // Neither end through a link: the folder moved could be one, and its name is written in it after.
+        if (!\is_dir($old) || Files::throughLink($this->rootDir, $old.'/'.self::PATH_FILE) || Files::throughLink($this->rootDir, $new.'/'.self::PATH_FILE)) {
             return;
         }
         try {
