@@ -7,6 +7,8 @@ names its file, because the list is not always about the tab you are looking
 at — a right-click in the tree opens the history of THAT file, and a file that
 has been deleted has no tab at all.
 
+![A file compared with an older snapshot of itself](/screenshots/plugin-local-history.svg)
+
 **Compare with Local History** (the command palette, or a right-click on the
 editor or on a file) shows what a snapshot would change before you restore it:
 pick one, and the diff opens in its own panel — oldest on the left, so a `-`
