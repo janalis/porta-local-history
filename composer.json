@@ -1,5 +1,5 @@
 {
-    "name": "porta/local-history",
+    "name": "janalis/porta-local-history",
     "description": "Snapshots every save and restores one as a single undoable edit",
     "type": "porta-plugin",
     "license": "MIT",

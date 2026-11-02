@@ -1,0 +1,21 @@
+name: Close Pull Request
+
+# This repository is a read-only split of janalis/porta: a pull request here
+# is closed with a pointer to the main repository.
+on:
+  pull_request_target:
+    types: [opened]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: superbrothers/close-pull-request@v3
+        with:
+          comment: |
+            Thanks for your pull request! This repository is a read-only split
+            of `plugins/` in https://github.com/janalis/porta: please open it
+            there instead.
