@@ -14,7 +14,7 @@ use Symfony\Component\Filesystem\Filesystem;
  * The feature itself: snapshot on save, list a file's snapshots in a dock tab,
  * restore the picked one into the buffer as a single undoable edit.
  *
- * It lives here rather than in `plugin.php` because a plugin file only WIRES —
+ * It lives here rather than in `porta.php` because a plugin file only WIRES —
  * everything under `src/` is analysed by mago and held at 100% by this plugin's
  * own tests, and a restore that swaps a whole document is exactly the logic
  * that must be.
