@@ -348,8 +348,6 @@ final readonly class SnapshotStore
     {
         // A deleted file keeps its key: a store whose key stopped resolving the
         // moment a file went could not answer the one question it exists for.
-        $resolved = \realpath($path);
-
-        return $this->baseDir.'/'.\substr(\md5(false === $resolved ? Files::canonicalGone($path) : $resolved), offset: 0, length: 16);
+        return $this->baseDir.'/'.\substr(\md5(Files::canonicalGone($path)), offset: 0, length: 16);
     }
 }
