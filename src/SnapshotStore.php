@@ -159,7 +159,7 @@ final readonly class SnapshotStore
         $out = [];
         foreach (\is_array($names) ? $names : [] as $name) {
             $pathFile = $this->baseDir.'/'.$name.'/'.self::PATH_FILE;
-            $path = \is_file($pathFile) ? (string) \file_get_contents($pathFile) : '';
+            $path = Files::read($pathFile);
             $entries = '' === $path ? [] : $this->list($path);
             if ([] === $entries) {
                 continue;
@@ -246,9 +246,7 @@ final readonly class SnapshotStore
 
     public function read(string $snapFile): ?string
     {
-        $content = \is_file($snapFile) ? \file_get_contents($snapFile) : false;
-
-        return false === $content ? null : $content;
+        return Files::tryRead($snapFile);
     }
 
     /** @param list<array{stamp: int, file: string}> $entries newest first, the just-written snapshot included */

@@ -6,6 +6,7 @@ namespace Porta\LocalHistory;
 
 use Porta\Overlay\State\ToastSeverity;
 use Porta\Plugin\Api\PluginApi;
+use Porta\Support\Files;
 use Porta\Workbench\Dock\ToolRun;
 use Symfony\Component\Filesystem\Exception\IOExceptionInterface;
 use Symfony\Component\Filesystem\Filesystem;
@@ -87,8 +88,8 @@ final class HistoryTool
     /** Save-time snapshot. The bytes are already on disk when onFileSaved fires. */
     public function snapshot(string $path): void
     {
-        $content = \is_file($path) ? \file_get_contents($path) : false;
-        if (false === $content) {
+        $content = Files::tryRead($path);
+        if (null === $content) {
             return; // deleted or unreadable between the write and this hook
         }
         ($this->store)()->snapshot($path, $content);
