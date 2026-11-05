@@ -309,8 +309,7 @@ final readonly class SnapshotStore
                 break;
             }
             $path = $file->getPathname();
-            $real = \realpath($path);
-            $hash = \substr(\md5(false === $real ? $path : $real), offset: 0, length: 16);
+            $hash = \substr(\md5(Files::canonical($path)), offset: 0, length: 16);
             if (!\array_key_exists($hash, $wanted)) {
                 continue;
             }
@@ -349,19 +348,10 @@ final readonly class SnapshotStore
 
     private function dirFor(string $path): string
     {
+        // A deleted file keeps its key: a store whose key stopped resolving the
+        // moment a file went could not answer the one question it exists for.
         $resolved = \realpath($path);
-        if (false === $resolved) {
-            // The file is GONE — and a store whose key stops resolving the
-            // moment a file is deleted cannot answer the one question it exists
-            // for. `realpath()` returns false for a path with no file behind
-            // it, so canonicalise the DIRECTORY (which is still there) and put
-            // the name back: on a tree reached through a symlink — /var on
-            // macOS, a symlinked checkout — that is the same string the file's
-            // own realpath gave while it existed, so the history stays found.
-            $parent = \realpath(\dirname($path));
-            $resolved = false === $parent ? $path : $parent.'/'.\basename($path);
-        }
 
-        return $this->baseDir.'/'.\substr(\md5($resolved), offset: 0, length: 16);
+        return $this->baseDir.'/'.\substr(\md5(false === $resolved ? Files::canonicalGone($path) : $resolved), offset: 0, length: 16);
     }
 }
