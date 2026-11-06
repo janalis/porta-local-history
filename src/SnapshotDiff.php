@@ -60,7 +60,9 @@ final readonly class SnapshotDiff
         // keeps it out; the flags keep the user's own drivers from rewriting
         // what is compared, and the output from being anything but a diff.
         return new AsyncProcess(
-            [$binary, 'diff', '--no-index', '--no-ext-diff', '--no-textconv', '--unified=3', '--', $snapshot, $current],
+            // --no-color: a global `color.ui = always` still reaches here, and
+            // a coloured `@@` is no hunk header to the scan below.
+            [$binary, 'diff', '--no-index', '--no-color', '--no-ext-diff', '--no-textconv', '--unified=3', '--', $snapshot, $current],
             $this->cwd,
             timeout: self::TIMEOUT,
             env: [...\getenv(), 'GIT_DIR' => '/nonexistent'],
@@ -87,11 +89,18 @@ final readonly class SnapshotDiff
         $started = false;
         // Every body line carries a marker column (' ', '-', '+', '\\'), so
         // there are no blanks to skip once the first hunk header has landed.
+        $binary = false;
         foreach (\explode("\n", \rtrim($stdout, characters: "\n")) as $line) {
             $started = $started || \str_starts_with($line, '@@');
+            $binary = $binary || 1 === \preg_match('/^Binary files .* differ$/', $line);
             if ($started) {
                 $body[] = $line;
             }
+        }
+        // No hunk to show, and yet a difference: not "matches the file on disk".
+        // The line without its two paths, which name a snapshot's own file.
+        if ([] === $body && $binary) {
+            $body[] = 'Binary files differ';
         }
 
         return $body;

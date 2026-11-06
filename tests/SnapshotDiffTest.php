@@ -69,6 +69,32 @@ final class SnapshotDiffTest extends TestCase
         $this->assertSame([], $lines);
     }
 
+    /** Two different binary files have no hunk — and still differ. */
+    public function testBinaryFilesThatDifferSaySo(): void
+    {
+        $project = new TempProject(['old.png' => "\x89PNG\x00\x01", 'new.png' => "\x89PNG\x00\x02"]);
+
+        [$lines] = $this->diff(new SnapshotDiff($project->dir), $project->path('old.png'), $project->path('new.png'));
+
+        $this->assertSame(['Binary files differ'], $lines);
+    }
+
+    /** The user's own `color.ui = always` reaches a `--no-index` diff: a coloured `@@` is no hunk to find. */
+    public function testAColouredGlobalConfigStillReadsTheHunks(): void
+    {
+        $project = new TempProject(['old.txt' => "a\n", 'new.txt' => "b\n", 'gitconfig' => "[color]\n\tui = always\n"]);
+        $before = \getenv('GIT_CONFIG_GLOBAL');
+        \putenv('GIT_CONFIG_GLOBAL='.$project->path('gitconfig'));
+
+        try {
+            [$lines] = $this->diff(new SnapshotDiff($project->dir), $project->path('old.txt'), $project->path('new.txt'));
+        } finally {
+            \putenv(false === $before ? 'GIT_CONFIG_GLOBAL' : 'GIT_CONFIG_GLOBAL='.$before);
+        }
+
+        $this->assertContains('-a', $lines ?? []);
+    }
+
     public function testGitsOWNFailureReadsAsNoDiffRatherThanAsOutput(): void
     {
         // A missing path: git exits 128 with a complaint. Whatever it says
