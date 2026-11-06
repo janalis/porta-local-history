@@ -222,7 +222,7 @@ final readonly class SnapshotStore
 
             return;
         }
-        $this->nameOrphans(); // the histories that predate their sidecar, named before the walk reads them
+        $this->nameMovedOrphans($from, $to);
         $names = \is_dir($this->baseDir) ? \scandir($this->baseDir) : false;
         foreach (\is_array($names) ? $names : [] as $name) {
             $path = Files::read($this->baseDir.'/'.$name.'/'.self::PATH_FILE);
@@ -317,16 +317,8 @@ final readonly class SnapshotStore
         }
 
         $seen = 0;
-        $walk = new \RecursiveIteratorIterator(
-            new \RecursiveCallbackFilterIterator(
-                new \RecursiveDirectoryIterator($this->rootDir, \FilesystemIterator::SKIP_DOTS),
-                static fn (mixed $file): bool => !$file instanceof \SplFileInfo || !$file->isDir() || !\in_array($file->getFilename(), self::SKIP_DIRS, strict: true),
-            ),
-            \RecursiveIteratorIterator::LEAVES_ONLY,
-            \RecursiveIteratorIterator::CATCH_GET_CHILD,
-        );
         /** @var \SplFileInfo $file */
-        foreach ($walk as $file) {
+        foreach ($this->filesUnder($this->rootDir) as $file) {
             if (++$seen > $this->scanLimit) {
                 break;
             }
@@ -353,6 +345,47 @@ final readonly class SnapshotStore
     }
 
     /** An unwritable store is the next save's problem, not this view's. */
+    /**
+     * The histories of a renamed folder's files that predate their sidecar,
+     * named by their OLD paths — which the files now under $to give back.
+     * {@see nameOrphans()} cannot: it runs after the move, hashes the new
+     * paths, which no orphan is keyed by, and marks what it did not match as
+     * nobody's, for good.
+     */
+    private function nameMovedOrphans(string $from, string $to): void
+    {
+        // Hashed over the old FOLDER's resolved form, one level up from what
+        // is gone: {@see dirFor()} resolves a gone file's parent only, and
+        // here the parent is gone too.
+        $base = Files::canonicalGone($from);
+        $seen = 0;
+        /** @var \SplFileInfo $file */
+        foreach ($this->filesUnder($to) as $file) {
+            if (++$seen > $this->scanLimit) {
+                break;
+            }
+            $inside = \substr($file->getPathname(), \strlen($to));
+            $hash = \substr(\md5($base.$inside), offset: 0, length: 16);
+            // A sidecar it already has names this same path, so writing it is no change.
+            if (\is_dir($this->baseDir.'/'.$hash)) {
+                $this->writeSidecar($hash, $from.$inside);
+            }
+        }
+    }
+
+    /** Every file under $dir, past the tools' own folders and any it cannot read. */
+    private function filesUnder(string $dir): \RecursiveIteratorIterator
+    {
+        return new \RecursiveIteratorIterator(
+            new \RecursiveCallbackFilterIterator(
+                new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS),
+                static fn (mixed $file): bool => !$file instanceof \SplFileInfo || !$file->isDir() || !\in_array($file->getFilename(), self::SKIP_DIRS, strict: true),
+            ),
+            \RecursiveIteratorIterator::LEAVES_ONLY,
+            \RecursiveIteratorIterator::CATCH_GET_CHILD,
+        );
+    }
+
     private function writeSidecar(string $hash, string $path): void
     {
         if (Files::throughLink($this->rootDir, $this->baseDir.'/'.$hash.'/'.self::PATH_FILE)) {

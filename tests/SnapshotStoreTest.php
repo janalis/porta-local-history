@@ -305,6 +305,34 @@ final class SnapshotStoreTest extends TestCase
         $this->assertCount(1, $history->list($project->path('src/New/deep/B.php')), 'its snapshots, under its new name');
     }
 
+    /** A history older than its sidecar moves with its folder too: it is named by the path it had, not left nobody's. */
+    public function testAFolderRenameTakesAHistoryWithNoSidecarAlong(): void
+    {
+        $project = new TempProject(['src/Old/A.php' => "a\n"]);
+        $history = new SnapshotStore($project->dir, $this->clock());
+        $history->snapshot($project->path('src/Old/A.php'), "v1\n");
+        \unlink(\dirname((string) $history->list($project->path('src/Old/A.php'))[0]['file']).'/path');
+        \rename($project->path('src/Old'), $project->path('src/New'));
+
+        $history->rename($project->path('src/Old'), $project->path('src/New'));
+
+        $this->assertCount(1, $history->list($project->path('src/New/A.php')), 'its snapshots, under its new name');
+    }
+
+    /** The same cap as the project walk: past it, a folder's old histories are not looked for. */
+    public function testAFolderRenameNamesOrphansOnlyUpToTheScanLimit(): void
+    {
+        $project = new TempProject(['src/Old/A.php' => "a\n"]);
+        $history = new SnapshotStore($project->dir, $this->clock(), scanLimit: 0);
+        $history->snapshot($project->path('src/Old/A.php'), "v1\n");
+        \unlink(\dirname((string) $history->list($project->path('src/Old/A.php'))[0]['file']).'/path');
+        \rename($project->path('src/Old'), $project->path('src/New'));
+
+        $history->rename($project->path('src/Old'), $project->path('src/New'));
+
+        $this->assertSame([], $history->list($project->path('src/New/A.php')));
+    }
+
     public function testSnapshotAndList(): void
     {
         $project = new TempProject(['a.php' => "v1\n"]);
