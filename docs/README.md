@@ -1,10 +1,10 @@
 # Local history
 
-Every save snapshots the file under `.porta/history/` (25 snapshots per
-file, oldest pruned) independently of git. `Ctrl+Alt+H` lists the active
-file's snapshots; `Enter` restores one as a single undoable edit. Each row
-names its file, because the list is not always about the tab you are looking
-at — a right-click in the tree opens the history of THAT file, and a file that
+Every save snapshots the file under `.porta/history/` (25 per file by
+default, oldest pruned — see [Settings](#settings)) independently of git.
+`Ctrl+Alt+H` lists the active file's snapshots; `Enter` restores one as a
+single undoable edit. Each row names its file, because the list is not always
+about the tab you are looking at — a right-click in the tree opens the history of THAT file, and a file that
 has been deleted has no tab at all.
 
 ![A file compared with an older snapshot of itself](/screenshots/plugin-local-history.svg)
@@ -31,6 +31,10 @@ everywhere else `Enter` replaces the buffer and saving stays yours, because a
 file that exists is yours to keep; here there is nothing to keep and nothing to
 overwrite.
 
+A folder deleted in Porta keeps its files' history the same way: each of its
+files is kept as a deleted file is, with an open one's unsaved text, up to 500
+of them. A file or folder renamed in Porta takes its history along.
+
 A history directory is named after a HASH of the path, so each one records its
 own path in a small sidecar file. Directories written before that existed are
 recovered the first time you open this view: a hash cannot be inverted, but it
@@ -44,3 +48,9 @@ That comparison is the one part that needs `git` on your `PATH` — it runs
 `git diff --no-index`, which takes two arbitrary paths and so works in a
 project that is not a repository. Without git the snapshots still record and
 still restore; only the comparison is unavailable, and it says so.
+
+## Settings
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| Snapshots kept per file | 25 | Past it, the oldest snapshot is pruned; 1 to 500 |
