@@ -178,7 +178,12 @@ final readonly class SnapshotStore
      */
     public function list(string $path): array
     {
-        $dir = $this->dirFor($path);
+        return $this->entriesIn($this->dirFor($path));
+    }
+
+    /** @return list<array{stamp: int, file: string}> the snapshots in history directory $dir, newest first */
+    private function entriesIn(string $dir): array
+    {
         $entries = [];
         $names = \is_dir($dir) ? \scandir($dir) : false;
         foreach (\is_array($names) ? $names : [] as $name) {
@@ -206,13 +211,32 @@ final readonly class SnapshotStore
      * the resident snapshot alone — same millisecond, and one of them has to
      * win.
      *
-     * Only a FILE rename is followed. A directory's is not reachable: the
-     * layout is `md5(path)` and that does not run backwards, so there is no way
-     * to enumerate the snapshot dirs belonging to files inside it.
+     * A FOLDER's rename moves the history of every file in it. The layout is
+     * `md5(path)`, which does not run backwards — but each history names its
+     * file in its sidecar, so the ones under the folder are a walk away.
      */
     public function rename(string $from, string $to): void
     {
-        $old = $this->dirFor($from);
+        if (!\is_dir($to)) {
+            $this->move($this->dirFor($from), $to);
+
+            return;
+        }
+        $this->nameOrphans(); // the histories that predate their sidecar, named before the walk reads them
+        $names = \is_dir($this->baseDir) ? \scandir($this->baseDir) : false;
+        foreach (\is_array($names) ? $names : [] as $name) {
+            $path = Files::read($this->baseDir.'/'.$name.'/'.self::PATH_FILE);
+            // By its directory, not its old path: with the folder gone, the old
+            // path no longer resolves to the form its hash was taken over.
+            if (\str_starts_with($path, $from.'/')) {
+                $this->move($this->baseDir.'/'.$name, $to.\substr($path, \strlen($from)));
+            }
+        }
+    }
+
+    /** Move the history in directory $old to the file now at $to, merging into one it already has. */
+    private function move(string $old, string $to): void
+    {
         $new = $this->dirFor($to);
         // Neither end through a link: the folder moved could be one, and its name is written in it after.
         if (!\is_dir($old) || Files::throughLink($this->rootDir, $old.'/'.self::PATH_FILE) || Files::throughLink($this->rootDir, $new.'/'.self::PATH_FILE)) {
@@ -228,7 +252,7 @@ final readonly class SnapshotStore
 
                 return;
             }
-            foreach ($this->list($from) as $entry) {
+            foreach ($this->entriesIn($old) as $entry) {
                 $target = $new.'/'.\basename($entry['file']);
                 if (!\is_file($target)) {
                     $this->fs->rename($entry['file'], $target);

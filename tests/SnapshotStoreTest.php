@@ -287,6 +287,24 @@ final class SnapshotStoreTest extends TestCase
         $this->assertSame([$project->path('new.php')], \array_column($history->recent(), 'path'));
     }
 
+    /** A folder moved takes its files' history along — and a folder whose name only starts the same keeps its own. */
+    public function testAFolderRenameTakesItsFilesHistoryAlong(): void
+    {
+        $project = new TempProject(['src/Old/A.php' => "a\n", 'src/Old/deep/B.php' => "b\n", 'src/Oldish/C.php' => "c\n"]);
+        $history = new SnapshotStore($project->dir, $this->clock());
+        foreach (['src/Old/A.php', 'src/Old/deep/B.php', 'src/Oldish/C.php'] as $file) {
+            $history->snapshot($project->path($file), "v1\n");
+        }
+        \rename($project->path('src/Old'), $project->path('src/New'));
+
+        $history->rename($project->path('src/Old'), $project->path('src/New'));
+
+        $paths = \array_column($history->recent(), 'path');
+        \sort($paths);
+        $this->assertSame([$project->path('src/New/A.php'), $project->path('src/New/deep/B.php'), $project->path('src/Oldish/C.php')], $paths);
+        $this->assertCount(1, $history->list($project->path('src/New/deep/B.php')), 'its snapshots, under its new name');
+    }
+
     public function testSnapshotAndList(): void
     {
         $project = new TempProject(['a.php' => "v1\n"]);
