@@ -232,6 +232,17 @@ final class IdeLocalHistoryPluginTest extends TestCase
                 1100 => function (Tui $tui, VirtualTerminal $terminal): void {
                     $this->awaitPainted($tui, $terminal, 'That snapshot matches the file on disk');
                 },
+                1250 => function (Tui $tui, VirtualTerminal $terminal, Ide $ide) use ($project): void {
+                    // Gone from disk, its tab still open: git cannot compare,
+                    // and that is said — "matches the file on disk" was.
+                    \unlink($project->path('A.php'));
+                    Services::resolve($ide, CommandRegistry::class)->run('local-history:compare_snapshot');
+                    $this->awaitPainted($tui, $terminal, 'Compare with Snapshot');
+                    $tui->handleInput("\r");
+                },
+                1400 => function (Tui $tui, VirtualTerminal $terminal): void {
+                    $this->awaitPainted($tui, $terminal, 'Could not read that snapshot');
+                },
             ],
         );
     }

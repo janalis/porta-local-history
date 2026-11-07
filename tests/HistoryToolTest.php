@@ -80,6 +80,8 @@ final class HistoryToolTest extends TestCase
 
     private RecordingFileOpener $opener;
 
+    private MenuFileContext $menuFile;
+
     private function tool(): HistoryTool
     {
         $this->project = new TempProject(['a.php' => "one\n"]);
@@ -104,7 +106,7 @@ final class HistoryToolTest extends TestCase
             new DockToolController($manager, $this->dock, new ProjectPaths($this->project->dir)),
             TestDockTools::replacer($this->buffers),
             new CodeEditorWidget(),
-            new MenuFileContext(),
+            $this->menuFile = new MenuFileContext(),
             new ViewRegistry(),
             new Clipboard($tui),
             new StatusBarWidget(),
@@ -394,6 +396,30 @@ final class HistoryToolTest extends TestCase
 
         $this->assertSame("other\n", $this->buffers->active()?->document->getText());
         $this->assertStringContainsString('a.php', $this->flashText($this->status));
+    }
+
+    /**
+     * In a project opened through a symlink a tree row names the file as the
+     * root was typed, and its buffer is keyed by the real path: the restore
+     * compared the two spellings, found them different, and said the file
+     * was gone — every time, from the tree.
+     */
+    public function testARestoreFromTheTreeOfAProjectOpenedThroughALinkLands(): void
+    {
+        $tool = $this->tool();
+        $real = (string) \realpath($this->project->path('a.php'));
+        $this->buffers->open($real, "one\n");
+        $this->buffers->setActive($real);
+        $tool->snapshot($real);
+        $this->buffers->active()?->document->insert('changed ');
+        $linked = $this->project->alias().'/a.php';
+        $this->assertNotSame($real, $linked, 'the premise: two spellings of one file');
+
+        $this->menuFile->with($linked, $tool->show(...));
+        $tool->restore(0);
+
+        $this->assertSame("one\n", $this->buffers->active()?->document->getText(), 'restored into the file it is about');
+        $this->assertStringNotContainsString('no longer there', $this->flashText($this->status));
     }
 
     /**

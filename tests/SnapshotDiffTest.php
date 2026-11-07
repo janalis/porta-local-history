@@ -21,19 +21,21 @@ final class SnapshotDiffTest extends TestCase
     use PreservesPath;
     use PumpsLoop;
 
-    /** @return array{list<string>|null, bool} the body lines once they land, and start()'s answer */
+    /** @return array{list<string>|null, bool} the body lines once they land (null: git could not compare), and start()'s answer */
     private function diff(SnapshotDiff $differ, string $a, string $b): array
     {
         $lines = null;
-        $started = $differ->run($a, $b, static function (array $body) use (&$lines): void {
+        $landed = false;
+        $started = $differ->run($a, $b, static function (?array $body) use (&$lines, &$landed): void {
             $lines = $body;
+            $landed = true;
         });
         if ($started) {
-            // By reference, not an arrow fn: an arrow fn captures $lines by
-            // VALUE, so the condition would test the null it saw at creation
+            // By reference, not an arrow fn: an arrow fn captures $landed by
+            // VALUE, so the condition would test the false it saw at creation
             // and await would burn its whole budget.
-            $this->await(static function () use (&$lines): bool {
-                return null !== $lines;
+            $this->await(static function () use (&$landed): bool {
+                return $landed;
             });
         }
 
@@ -95,16 +97,17 @@ final class SnapshotDiffTest extends TestCase
         $this->assertContains('-a', $lines ?? []);
     }
 
-    public function testGitsOWNFailureReadsAsNoDiffRatherThanAsOutput(): void
+    public function testGitsOWNFailureReadsAsAFailureNeitherOutputNorAMatch(): void
     {
         // A missing path: git exits 128 with a complaint. Whatever it says
-        // belongs in neither the panel nor a row.
+        // belongs in neither the panel nor a row — and an empty diff would be
+        // read as "the snapshot matches the file", the opposite of the truth.
         $project = new TempProject(['one.txt' => "same\n"]);
         $differ = new SnapshotDiff($project->dir);
 
         [$lines] = $this->diff($differ, $project->path('gone.txt'), $project->path('one.txt'));
 
-        $this->assertSame([], $lines);
+        $this->assertNull($lines);
     }
 
     /**

@@ -44,7 +44,8 @@ final readonly class SnapshotDiff
      * PhpStorm shows, so a `-` line is what restoring would bring back and a
      * `+` line is what it would take away.
      *
-     * @param \Closure(list<string>): void $onDone the diff's body lines, header dropped; empty when the two match
+     * @param \Closure(?list<string>): void $onDone the diff's body lines, header dropped; empty when the two
+     *                                         match, null when git could not compare them
      */
     public function run(string $snapshot, string $current, \Closure $onDone): bool
     {
@@ -68,9 +69,13 @@ final readonly class SnapshotDiff
             env: [...\getenv(), 'GIT_DIR' => '/nonexistent'],
         )->start(static function (int $code, string $stdout) use ($onDone): void {
             // Exit 1 means "they differ", which is the interesting case; 0
-            // means identical. Anything else is a real failure and reads as no
-            // diff rather than as a panel full of git's complaint.
-            $onDone(0 === $code || 1 === $code ? self::body($stdout) : []);
+            // means identical. Anything else is a real failure — said as one,
+            // not as an empty diff the caller took for "they match". So is an
+            // exit 1 that printed nothing: git exits 1 for a file it cannot
+            // read too, its complaint on stderr, and a real difference always
+            // prints something.
+            $body = 0 === $code || 1 === $code ? self::body($stdout) : null;
+            $onDone(1 === $code && [] === $body ? null : $body);
         });
     }
 

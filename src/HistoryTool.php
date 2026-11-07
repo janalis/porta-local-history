@@ -242,23 +242,34 @@ final class HistoryTool
         }
 
         $this->api->pick($this->api->trans('Compare with Snapshot'), $items, function (string $file) use ($path, $differ): void {
-            $differ->run($file, $path, function (array $lines) use ($path): void {
-                if ([] === $lines) {
-                    $this->api->flash($this->api->trans('That snapshot matches the file on disk'));
+            $differ->run(
+                $file,
+                $path,
+                /** @param list<string>|null $lines */ function (?array $lines) use ($path): void {
+                    if (null === $lines) {
+                        // git could not compare them — a file gone from disk, a run
+                        // past its timeout: not "they match", which was said.
+                        $this->api->notify($this->api->trans('Could not read that snapshot'), ToastSeverity::Error);
 
-                    return;
-                }
+                        return;
+                    }
+                    if ([] === $lines) {
+                        $this->api->flash($this->api->trans('That snapshot matches the file on disk'));
 
-                $rows = [];
-                foreach ($lines as $line) {
-                    // Location-less, like the history rows: a diff line has no
-                    // place to jump to, and the panel prints no `file:line`
-                    // rather than inventing one.
-                    $rows[] = ['path' => '', 'line' => 0, 'text' => $line];
-                }
-                $this->api->showList(self::DIFF_TOOL, $rows, ToolRun::Finished);
-                $this->api->flash($this->api->trans('Comparing %file% with a snapshot', ['%file%' => \basename($path)]));
-            });
+                        return;
+                    }
+
+                    $rows = [];
+                    foreach ($lines as $line) {
+                        // Location-less, like the history rows: a diff line has no
+                        // place to jump to, and the panel prints no `file:line`
+                        // rather than inventing one.
+                        $rows[] = ['path' => '', 'line' => 0, 'text' => $line];
+                    }
+                    $this->api->showList(self::DIFF_TOOL, $rows, ToolRun::Finished);
+                    $this->api->flash($this->api->trans('Comparing %file% with a snapshot', ['%file%' => \basename($path)]));
+                },
+            );
         });
     }
 
@@ -295,7 +306,7 @@ final class HistoryTool
         if (!\is_file($path) && !$this->recreate($path, $content)) {
             return;
         }
-        if ($this->api->activeFile() !== $path) {
+        if (!$this->isActive($path)) {
             $this->api->openFile($path);
         }
         // The POSTCONDITION, not the attempt. `replaceDocument()` replaces
@@ -304,7 +315,7 @@ final class HistoryTool
         // that is gone lands in whichever buffer the user happens to be looking
         // at. An undo safety net that overwrites an unrelated open file is the
         // worst thing this plugin could do.
-        if ($this->api->activeFile() !== $path) {
+        if (!$this->isActive($path)) {
             $this->api->notify($this->api->trans('Cannot restore %file% — it is no longer there', ['%file%' => \basename($path)]), ToastSeverity::Error);
 
             return;
@@ -325,5 +336,19 @@ final class HistoryTool
         }
 
         return true;
+    }
+
+    /**
+     * Whether the active buffer is the file at $path. Compared resolved: a
+     * tree row names the file as the root was typed, a buffer is keyed by its
+     * real path, and in a project opened through a symlink the two never
+     * matched — every restore from the tree said the file was gone.
+     */
+    private function isActive(string $path): bool
+    {
+        $active = $this->api->activeFile();
+        $real = \realpath($path);
+
+        return $active === $path || (null !== $active && false !== $real && \realpath($active) === $real);
     }
 }
