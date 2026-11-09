@@ -27,7 +27,11 @@
                         ]
                     ]
                 }
-            ]
+            ],
+            "store": {
+                "title": "Local History",
+                "category": "version-control"
+            }
         }
     }
 }
