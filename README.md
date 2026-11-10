@@ -2,6 +2,8 @@
 
 Snapshots every save and restores one as a single undoable edit.
 
+![A file compared with an older snapshot of itself](https://janalis.github.io/porta/screenshots/plugin-local-history.svg)
+
 This is `janalis/porta-local-history`, one of the plugins bundled with
 [Porta](https://github.com/janalis/porta), the terminal IDE for PHP. Porta
 ships it already, on by default: turn it off under **Settings → Plugins**.
