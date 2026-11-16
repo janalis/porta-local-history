@@ -340,7 +340,7 @@ final readonly class SnapshotStore
         // deleted or moved out, which nothing could name anyway, and the next
         // save on any of them writes the real name over the marker.
         foreach ($wanted as $hash) {
-            $this->writeSidecar($hash, '');
+            $this->writeSidecar($hash, path: '');
         }
     }
 

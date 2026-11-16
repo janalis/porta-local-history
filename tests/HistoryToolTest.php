@@ -87,7 +87,7 @@ final class HistoryToolTest extends TestCase
         $this->project = new TempProject(['a.php' => "one\n"]);
         $settings = new PluginSettings($this->project->dir, []);
         $manager = new PluginManager(new EventDispatcher(), $settings);
-        $tui = TestTui::create(100, 24);
+        $tui = TestTui::create(100, rows: 24);
         $this->buffers = new BufferManager();
         $this->status = new StatusBarWidget();
         $this->results = new ResultsPanelWidget();
@@ -121,11 +121,11 @@ final class HistoryToolTest extends TestCase
             TestProjectSwitcher::create(),
         ));
         $api = $manager->api('local-history', $this->project->dir, $settings);
-        $api->registerListTool(HistoryTool::TOOL, 'Local History');
-        $api->registerListTool(HistoryTool::RECENT_TOOL, 'Recent Changes');
+        $api->registerListTool(HistoryTool::TOOL, title: 'Local History');
+        $api->registerListTool(HistoryTool::RECENT_TOOL, title: 'Recent Changes');
         $manager->commit($api);
 
-        $api->registerListTool(HistoryTool::DIFF_TOOL, 'Local History Diff');
+        $api->registerListTool(HistoryTool::DIFF_TOOL, title: 'Local History Diff');
         $this->clock = new MockClock();
         $store = new SnapshotStore($this->project->dir, $this->clock, maxPerFile: 25);
         $this->differ ??= new SnapshotDiff($this->project->dir);
@@ -167,7 +167,7 @@ final class HistoryToolTest extends TestCase
         $path = $this->project->path('a.php');
         \file_put_contents($path, data: "<?php // AFTER the refactoring\n");
 
-        $tool->snapshotReplaced($path, "<?php // BEFORE the refactoring\n");
+        $tool->snapshotReplaced($path, previousText: "<?php // BEFORE the refactoring\n");
 
         $store = new SnapshotStore($this->project->dir, $this->clock, maxPerFile: 25);
         $listed = $store->list($path);
@@ -262,7 +262,7 @@ final class HistoryToolTest extends TestCase
     {
         $tool = $this->tool();
         $path = $this->project->path('a.php');
-        $this->buffers->open($path, "one\n");
+        $this->buffers->open($path, content: "one\n");
         $this->buffers->setActive($path);
         $tool->snapshot($path);
         $tool->show();
@@ -283,7 +283,7 @@ final class HistoryToolTest extends TestCase
     private function listedThenDeleted(HistoryTool $tool): string
     {
         $gone = $this->project->path('a.php');
-        $this->buffers->open($gone, "one\n");
+        $this->buffers->open($gone, content: "one\n");
         $this->buffers->setActive($gone);
         $tool->snapshot($gone);
         $tool->show();
@@ -292,7 +292,7 @@ final class HistoryToolTest extends TestCase
         $this->buffers->close($gone);
         $other = $this->project->path('other.php');
         \file_put_contents($other, data: "other\n");
-        $this->buffers->open($other, "other\n");
+        $this->buffers->open($other, content: "other\n");
         $this->buffers->setActive($other);
 
         return $gone;
@@ -382,14 +382,14 @@ final class HistoryToolTest extends TestCase
     {
         $tool = $this->tool();
         $path = $this->project->path('a.php');
-        $this->buffers->open($path, "one\n");
+        $this->buffers->open($path, content: "one\n");
         $this->buffers->setActive($path);
         $tool->snapshot($path);
         $tool->show();
 
         $other = $this->project->path('other.php');
         \file_put_contents($other, data: "other\n");
-        $this->buffers->open($other, "other\n");
+        $this->buffers->open($other, content: "other\n");
         $this->buffers->setActive($other);
 
         $tool->restore(0);
@@ -408,7 +408,7 @@ final class HistoryToolTest extends TestCase
     {
         $tool = $this->tool();
         $real = (string) \realpath($this->project->path('a.php'));
-        $this->buffers->open($real, "one\n");
+        $this->buffers->open($real, content: "one\n");
         $this->buffers->setActive($real);
         $tool->snapshot($real);
         $this->buffers->active()?->document->insert('changed ');
@@ -433,7 +433,7 @@ final class HistoryToolTest extends TestCase
     {
         $tool = $this->tool();
         $path = $this->project->path('a.php');
-        $this->buffers->open($path, "one\n");
+        $this->buffers->open($path, content: "one\n");
         $this->buffers->setActive($path);
         $tool->snapshot($path);
         $this->clock->sleep(1);
@@ -459,7 +459,7 @@ final class HistoryToolTest extends TestCase
         $tool->showRecent();
         $this->assertStringNotContainsString('latest', $this->panel());
 
-        $tool->openOrShowHistory('a.php', 0);
+        $tool->openOrShowHistory('a.php', line: 0);
 
         $this->assertStringContainsString('is gone', $this->flashText($this->status));
         $this->assertStringContainsString('a.php  ', $this->panel(), 'and the panel names the file it is about — nothing else on screen does');
@@ -472,7 +472,7 @@ final class HistoryToolTest extends TestCase
     public function testRecentChangesOpensAFileThatIsStillThere(): void
     {
         $tool = $this->tool();
-        $tool->openOrShowHistory('a.php', 0);
+        $tool->openOrShowHistory('a.php', line: 0);
 
         $this->assertSame([$this->project->path('a.php')], \array_column($this->opener->opened, 'path'), 'it is opened');
         $this->assertStringNotContainsString('is gone', $this->flashText($this->status));
@@ -494,7 +494,7 @@ final class HistoryToolTest extends TestCase
         \putenv('PATH=/nonexistent');
         $this->differ = new SnapshotDiff(\sys_get_temp_dir());
         $tool = $this->tool();
-        $this->buffers->open($this->project->path('a.php'), "one\n");
+        $this->buffers->open($this->project->path('a.php'), content: "one\n");
 
         $tool->compare();
 
@@ -506,7 +506,7 @@ final class HistoryToolTest extends TestCase
         // The same refusal `show()` gives, and for the same reason: there is
         // nothing to pick from, so opening a picker would be a dead end.
         $tool = $this->tool();
-        $this->buffers->open($this->project->path('a.php'), "one\n");
+        $this->buffers->open($this->project->path('a.php'), content: "one\n");
 
         $tool->compare();
 
@@ -517,7 +517,7 @@ final class HistoryToolTest extends TestCase
     {
         $tool = $this->tool();
         $path = $this->project->path('a.php');
-        $this->buffers->open($path, "one\n");
+        $this->buffers->open($path, content: "one\n");
         $this->buffers->setActive($path);
 
         $tool->snapshot($path);

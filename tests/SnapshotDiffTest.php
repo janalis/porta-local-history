@@ -121,13 +121,13 @@ final class SnapshotDiffTest extends TestCase
         $project = new TempProject(['old.txt' => "a\n", 'new.txt' => "b\n", 'hook.sh' => "#!/bin/sh\ntouch \"\$(dirname \"\$0\")/ran-\$\$\"\ncat\n"]);
         \chmod($project->path('hook.sh'), permissions: 0o755);
         $project->initGit();
-        $project->write('.git/info/attributes', "*.txt filter=x diff=x\n");
+        $project->write('.git/info/attributes', content: "*.txt filter=x diff=x\n");
         foreach (['filter.x.clean', 'diff.x.textconv', 'diff.external'] as $key) {
             $project->git('config', $key, $project->path('hook.sh'));
         }
 
         // and the user's own: an external diff and a textconv in their global config
-        $project->write('home/attributes', "*.txt diff=y\n");
+        $project->write('home/attributes', content: "*.txt diff=y\n");
         $project->write('home/.gitconfig', \sprintf(
             "[core]\n\tattributesFile = %s\n[diff]\n\texternal = %2\$s\n[diff \"y\"]\n\ttextconv = %2\$s\n",
             $project->path('home/attributes'),

@@ -33,7 +33,7 @@ use Symfony\Component\Clock\NativeClock;
 return new class('local-history') extends AbstractPlugin {
     public function activate(PluginApi $api): void
     {
-        $api->registerSetting('maxPerFile', 'Snapshots kept per file', 'int', 25, min: 1, max: 500);
+        $api->registerSetting('maxPerFile', label: 'Snapshots kept per file', kind: 'int', default: 25, min: 1, max: 500);
 
         // ONE tool, because it remembers which file's snapshots are on display
         // — Enter has to restore into that file, and a per-call instance would
@@ -54,23 +54,23 @@ return new class('local-history') extends AbstractPlugin {
 
         $api->registerListTool(
             HistoryTool::TOOL,
-            'Local History',
+            title: 'Local History',
             rerun: $tool->show(...),
             // Enter restores; without it the row would take core's
             // open-and-jump, which for a location-less row means nothing.
             activate: static fn (string $path, int $line) => $tool->restore($line),
         );
-        $api->registerListTool(HistoryTool::DIFF_TOOL, 'Local History Diff');
+        $api->registerListTool(HistoryTool::DIFF_TOOL, title: 'Local History Diff');
         // Its rows carry a real path, so core's open-and-jump is exactly right
         // and no activate hook is needed — unlike the per-file tool above,
         // whose rows are location-less.
-        $api->registerListTool(HistoryTool::RECENT_TOOL, 'Recent Changes', rerun: $tool->showRecent(...), activate: $tool->openOrShowHistory(...));
-        $api->registerCommand('recent_changes', 'Recent Changes', $tool->showRecent(...));
+        $api->registerListTool(HistoryTool::RECENT_TOOL, title: 'Recent Changes', rerun: $tool->showRecent(...), activate: $tool->openOrShowHistory(...));
+        $api->registerCommand('recent_changes', label: 'Recent Changes', handler: $tool->showRecent(...));
         $api->adoptCommand('ide_local_history', $tool->show(...));
         // Its own id, not one of core's: core never named a compare verb, and
         // inventing a bare id here would claim a keybinding slot the keymap
         // page knows nothing about.
-        $api->registerCommand('compare_snapshot', 'Compare with Local History', $tool->compare(...));
+        $api->registerCommand('compare_snapshot', label: 'Compare with Local History', handler: $tool->compare(...));
         $api->addMenuItem('compare_snapshot', surface: MenuSurface::EditorContext);
         $api->addMenuItem('compare_snapshot', surface: MenuSurface::FileContext);
         // Right-click in the editor offers it too: "what did this file look

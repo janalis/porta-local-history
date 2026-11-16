@@ -76,13 +76,13 @@ final class IdeLocalHistoryPluginTest extends TestCase
                 600 => function (Tui $tui, VirtualTerminal $terminal): void {
                     $tui->handleInput("\x1b\x08"); // ctrl+alt+h — core's key, the plugin's handler
                     $this->assertSame('results', $tui->getFocus()?->getId());
-                    $this->awaitPainted($tui, $terminal, 'Local History');
+                    $this->awaitPainted($tui, $terminal, needle: 'Local History');
                     $this->assertStringContainsString('Local History', AnsiUtils::stripAnsiCodes($terminal->getOutput()));
                     $tui->handleInput("\x1b[B"); // the older snapshot
                     $tui->handleInput("\r");
                 },
                 750 => function (Tui $tui, VirtualTerminal $terminal): void {
-                    $this->awaitPainted($tui, $terminal, 'Restored from local history');
+                    $this->awaitPainted($tui, $terminal, needle: 'Restored from local history');
                     $this->assertStringContainsString('Restored from local history', AnsiUtils::stripAnsiCodes($terminal->getOutput()));
                     $this->assertStringContainsString('version two', Widgets::editor($tui)->getDocument()->getText());
 
@@ -122,10 +122,10 @@ final class IdeLocalHistoryPluginTest extends TestCase
                     // By label, not by counting Down presses: this plugin adds
                     // two items of its own to the file menu, so a count here
                     // would be counting its own contributions.
-                    $this->rightClick($tui, $ide, 'tree', colOffset: 3, rowOffset: $this->treeRowOf($tui, $ide, 'A.php'));
+                    $this->rightClick($tui, $ide, widgetId: 'tree', colOffset: 3, rowOffset: $this->treeRowOf($tui, $ide, file: 'A.php'));
                     $menu = Services::resolve($ide, ContextMenu::class);
                     /** @var list<MenuItem> $items */
-                    $items = Probe::get($menu, 'items');
+                    $items = Probe::get($menu, property: 'items');
                     foreach ($items as $i => $item) {
                         if (!\str_contains($item->label, 'Rename')) {
                             continue;
@@ -205,12 +205,12 @@ final class IdeLocalHistoryPluginTest extends TestCase
                 },
                 600 => function (Tui $tui, VirtualTerminal $terminal, Ide $ide): void {
                     Services::resolve($ide, CommandRegistry::class)->run('local-history:compare_snapshot');
-                    $this->awaitPainted($tui, $terminal, 'Compare with Snapshot');
+                    $this->awaitPainted($tui, $terminal, needle: 'Compare with Snapshot');
                     $tui->handleInput("\x1b[B"); // the OLDER snapshot
                     $tui->handleInput("\r");
                 },
                 800 => function (Tui $tui, VirtualTerminal $terminal): void {
-                    $this->awaitPainted($tui, $terminal, 'Local History Diff');
+                    $this->awaitPainted($tui, $terminal, needle: 'Local History Diff');
                     $screen = AnsiUtils::stripAnsiCodes($terminal->getOutput());
 
                     // The hunk body, oldest on the left: `-` is what restoring
@@ -226,22 +226,22 @@ final class IdeLocalHistoryPluginTest extends TestCase
                     // than opening a panel with nothing in it. The newest
                     // snapshot is always this, because saving is what takes one.
                     Services::resolve($ide, CommandRegistry::class)->run('local-history:compare_snapshot');
-                    $this->awaitPainted($tui, $terminal, 'Compare with Snapshot');
+                    $this->awaitPainted($tui, $terminal, needle: 'Compare with Snapshot');
                     $tui->handleInput("\r"); // the newest, pre-selected
                 },
                 1100 => function (Tui $tui, VirtualTerminal $terminal): void {
-                    $this->awaitPainted($tui, $terminal, 'That snapshot matches the file on disk');
+                    $this->awaitPainted($tui, $terminal, needle: 'That snapshot matches the file on disk');
                 },
                 1250 => function (Tui $tui, VirtualTerminal $terminal, Ide $ide) use ($project): void {
                     // Gone from disk, its tab still open: git cannot compare,
                     // and that is said — "matches the file on disk" was.
                     \unlink($project->path('A.php'));
                     Services::resolve($ide, CommandRegistry::class)->run('local-history:compare_snapshot');
-                    $this->awaitPainted($tui, $terminal, 'Compare with Snapshot');
+                    $this->awaitPainted($tui, $terminal, needle: 'Compare with Snapshot');
                     $tui->handleInput("\r");
                 },
                 1400 => function (Tui $tui, VirtualTerminal $terminal): void {
-                    $this->awaitPainted($tui, $terminal, 'Could not read that snapshot');
+                    $this->awaitPainted($tui, $terminal, needle: 'Could not read that snapshot');
                 },
             ],
         );
@@ -260,7 +260,7 @@ final class IdeLocalHistoryPluginTest extends TestCase
                     $tui->handleInput("\x1b\x08"); // nothing saved yet
                 },
                 450 => function (Tui $tui, VirtualTerminal $terminal): void {
-                    $this->awaitPainted($tui, $terminal, 'No local history for this file yet');
+                    $this->awaitPainted($tui, $terminal, needle: 'No local history for this file yet');
                     $this->assertStringContainsString('No local history for this file yet', AnsiUtils::stripAnsiCodes($terminal->getOutput()));
                 },
             ],
@@ -340,7 +340,7 @@ final class IdeLocalHistoryPluginTest extends TestCase
     /** The tree row index whose rendered text names $file. */
     private function treeRowOf(mixed $tui, mixed $ide, string $file): int
     {
-        $tree = Widgets::byId($tui, 'tree', FileTreeWidget::class);
+        $tree = Widgets::byId($tui, id: 'tree', class: FileTreeWidget::class);
         $rect = Services::resolve($ide, Renderer::class)->getWidgetRect($tree);
         foreach ($tree->render(new RenderContext($rect->columns, $rect->rows)) as $i => $line) {
             if (\str_contains(AnsiUtils::stripAnsiCodes($line), $file)) {
@@ -375,12 +375,12 @@ final class IdeLocalHistoryPluginTest extends TestCase
                 200 => function ($tui, $terminal, $ide): void {
                     $this->frame($tui);
 
-                    $this->rightClick($tui, $ide, 'editor', colOffset: 3, rowOffset: 0);
+                    $this->rightClick($tui, $ide, widgetId: 'editor', colOffset: 3, rowOffset: 0);
                     $this->assertStringContainsString('Show Local History', $this->menuLabels($ide), 'the editor menu offers it');
                     $tui->handleInput("\x1b");
                     $this->frame($tui);
 
-                    $this->rightClick($tui, $ide, 'tabs', colOffset: 1, rowOffset: 0);
+                    $this->rightClick($tui, $ide, widgetId: 'tabs', colOffset: 1, rowOffset: 0);
                     $this->assertStringContainsString('Show Local History', $this->menuLabels($ide), 'the tab menu offers it');
                     $tui->handleInput("\x1b");
                     $this->frame($tui);
@@ -403,13 +403,13 @@ final class IdeLocalHistoryPluginTest extends TestCase
             [
                 300 => function ($tui, $terminal, $ide) use ($project): void {
                     // Give other.php a snapshot, without ever making it active.
-                    $project->write('other.php', "two\n");
+                    $project->write('other.php', content: "two\n");
                     $store = new SnapshotStore($project->dir, new NativeClock(), maxPerFile: 25);
-                    $store->snapshot($project->path('other.php'), "one\n");
+                    $store->snapshot($project->path('other.php'), content: "one\n");
 
                     $this->frame($tui);
-                    $row = $this->treeRowOf($tui, $ide, 'other.php');
-                    $this->rightClick($tui, $ide, 'tree', colOffset: 3, rowOffset: $row);
+                    $row = $this->treeRowOf($tui, $ide, file: 'other.php');
+                    $this->rightClick($tui, $ide, widgetId: 'tree', colOffset: 3, rowOffset: $row);
                     $labels = $this->menuLabels($ide);
                     $this->assertStringContainsString('Show Local History', $labels, 'the tree row offers it: '.$labels);
 
@@ -417,7 +417,7 @@ final class IdeLocalHistoryPluginTest extends TestCase
                     // is still the active tab.
                     $menu = Services::resolve($ide, ContextMenu::class);
                     /** @var list<MenuItem> $items */
-                    $items = Probe::get($menu, 'items');
+                    $items = Probe::get($menu, property: 'items');
                     $index = null;
                     foreach ($items as $i => $item) {
                         if (!\str_contains($item->label, 'Show Local History')) {

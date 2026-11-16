@@ -32,11 +32,11 @@ final class SnapshotStoreTest extends TestCase
         $clock = $this->clock();
         $history = new SnapshotStore($project->dir, $clock);
 
-        $history->snapshot($project->path('a.php'), "a1\n");
+        $history->snapshot($project->path('a.php'), content: "a1\n");
         $clock->sleep(1);
-        $history->snapshot($project->path('b.php'), "b1\n");
+        $history->snapshot($project->path('b.php'), content: "b1\n");
         $clock->sleep(1);
-        $history->snapshot($project->path('a.php'), "a2\n");
+        $history->snapshot($project->path('a.php'), content: "a2\n");
 
         $recent = $history->recent();
         $this->assertSame([$project->path('a.php'), $project->path('b.php')], \array_column($recent, 'path'), 'a changed last');
@@ -56,7 +56,7 @@ final class SnapshotStoreTest extends TestCase
             }
             \symlink($elsewhere->dir, $project->path($linked));
 
-            $this->assertSame(-1, new SnapshotStore($project->dir, $this->clock())->snapshot($project->path('a.php'), "a1\n"), $linked);
+            $this->assertSame(-1, new SnapshotStore($project->dir, $this->clock())->snapshot($project->path('a.php'), content: "a1\n"), $linked);
             $this->assertSame(['keep'], \array_values(\array_diff((array) \scandir($elsewhere->dir), ['.', '..'])), $linked.': nothing written there');
             $this->assertSame(0o755, \fileperms($elsewhere->dir) & 0o777, $linked.': nor chmod\'ed');
         }
@@ -75,7 +75,7 @@ final class SnapshotStoreTest extends TestCase
         $elsewhere = new TempProject(['keep' => '']);
         $project = new TempProject(['a.php' => "a\n", 'b.php' => "b\n", '.porta/history/.keep' => '']);
         $history = new SnapshotStore($project->dir, $this->clock());
-        $history->snapshot($project->path('a.php'), "a1\n");
+        $history->snapshot($project->path('a.php'), content: "a1\n");
         foreach (['a.php', 'b.php'] as $file) {
             $folder = $project->path('.porta/history/'.\substr(\md5((string) \realpath($project->path($file))), offset: 0, length: 16));
             if (!\is_dir($folder)) {
@@ -91,7 +91,7 @@ final class SnapshotStoreTest extends TestCase
     /** @return iterable<string, array{\Closure(SnapshotStore, TempProject): mixed}> */
     public static function writesIntoAFilesFolder(): iterable
     {
-        yield 'a snapshot' => [static fn (SnapshotStore $history, TempProject $project): int => $history->snapshot($project->path('b.php'), "b1\n")];
+        yield 'a snapshot' => [static fn (SnapshotStore $history, TempProject $project): int => $history->snapshot($project->path('b.php'), content: "b1\n")];
         yield 'a rename of it' => [static fn (SnapshotStore $history, TempProject $project) => $history->rename($project->path('b.php'), $project->path('c.php'))];
         yield 'a rename onto it' => [static fn (SnapshotStore $history, TempProject $project) => $history->rename($project->path('a.php'), $project->path('b.php'))];
         yield 'naming an orphan' => [static fn (SnapshotStore $history): array => $history->recent()];
@@ -101,7 +101,7 @@ final class SnapshotStoreTest extends TestCase
     {
         $project = new TempProject(['.env' => "SECRET=1\n", '.porta/history/.keep' => '']);
         \chmod($project->path('.porta/history'), permissions: 0o755); // as a history made before this was
-        new SnapshotStore($project->dir, $this->clock())->snapshot($project->path('.env'), "SECRET=1\n");
+        new SnapshotStore($project->dir, $this->clock())->snapshot($project->path('.env'), content: "SECRET=1\n");
 
         $this->assertSame(0o700, \fileperms($project->path('.porta/history')) & 0o777);
     }
@@ -122,7 +122,7 @@ final class SnapshotStoreTest extends TestCase
     {
         $project = new TempProject(['a.php' => "a\n"]);
         $history = new SnapshotStore($project->dir, $this->clock());
-        $history->snapshot($project->path('a.php'), "a1\n");
+        $history->snapshot($project->path('a.php'), content: "a1\n");
 
         $dir = \dirname((string) $history->list($project->path('a.php'))[0]['file']);
         \unlink($dir.'/path');
@@ -142,7 +142,7 @@ final class SnapshotStoreTest extends TestCase
     {
         $project = new TempProject(['a.php' => "a\n"]);
         $history = new SnapshotStore($project->dir, $this->clock());
-        $history->snapshot($project->path('a.php'), "a1\n");
+        $history->snapshot($project->path('a.php'), content: "a1\n");
 
         $dir = \dirname((string) $history->list($project->path('a.php'))[0]['file']);
         \unlink($dir.'/path');
@@ -158,7 +158,7 @@ final class SnapshotStoreTest extends TestCase
     {
         $project = new TempProject(['src/deep/a.php' => "a\n"]);
         $history = new SnapshotStore($project->dir, $this->clock());
-        $history->snapshot($project->path('src/deep/a.php'), "a1\n");
+        $history->snapshot($project->path('src/deep/a.php'), content: "a1\n");
         \unlink(\dirname((string) $history->list($project->path('src/deep/a.php'))[0]['file']).'/path');
 
         $this->assertSame([$project->path('src/deep/a.php')], \array_column($history->recent(), 'path'));
@@ -173,7 +173,7 @@ final class SnapshotStoreTest extends TestCase
     {
         $project = new TempProject(['a.php' => "a\n"]);
         $history = new SnapshotStore($project->dir, $this->clock(), scanLimit: 1);
-        $history->snapshot($project->path('a.php'), "a1\n");
+        $history->snapshot($project->path('a.php'), content: "a1\n");
         \unlink(\dirname((string) $history->list($project->path('a.php'))[0]['file']).'/path');
 
         $this->assertSame([$project->path('a.php')], \array_column($history->recent(), 'path'));
@@ -190,7 +190,7 @@ final class SnapshotStoreTest extends TestCase
     {
         $project = new TempProject(['a.php' => "a\n"]);
         $history = new SnapshotStore($project->dir, $this->clock());
-        $history->snapshot($project->path('a.php'), "a1\n");
+        $history->snapshot($project->path('a.php'), content: "a1\n");
         $digits = $project->path('.porta/history/1234567890123456');
         \mkdir($digits);
 
@@ -210,7 +210,7 @@ final class SnapshotStoreTest extends TestCase
         // a test that fails on somebody else's machine.
         $project = new TempProject(['a.php' => "a\n"]);
         $history = new SnapshotStore($project->dir, $this->clock(), scanLimit: 0);
-        $history->snapshot($project->path('a.php'), "a1\n");
+        $history->snapshot($project->path('a.php'), content: "a1\n");
         $dir = \dirname((string) $history->list($project->path('a.php'))[0]['file']);
         \unlink($dir.'/path');
 
@@ -228,13 +228,13 @@ final class SnapshotStoreTest extends TestCase
     {
         $project = new TempProject(['vendor/x.php' => "x\n"]);
         $history = new SnapshotStore($project->dir, $this->clock());
-        $history->snapshot($project->path('vendor/x.php'), "x1\n");
+        $history->snapshot($project->path('vendor/x.php'), content: "x1\n");
         $dir = \dirname((string) $history->list($project->path('vendor/x.php'))[0]['file']);
         \unlink($dir.'/path');
 
         $this->assertSame([], $history->recent(), 'the walk never entered vendor/');
 
-        $history->snapshot($project->path('vendor/x.php'), "x2\n");
+        $history->snapshot($project->path('vendor/x.php'), content: "x2\n");
         $this->assertSame([$project->path('vendor/x.php')], \array_column($history->recent(), 'path'), 'and a save still names it');
     }
 
@@ -243,7 +243,7 @@ final class SnapshotStoreTest extends TestCase
     {
         $project = new TempProject(['a.php' => "a\n"]);
         $history = new SnapshotStore($project->dir, $this->clock());
-        $history->snapshot($project->path('a.php'), "a1\n");
+        $history->snapshot($project->path('a.php'), content: "a1\n");
         $dir = \dirname((string) $history->list($project->path('a.php'))[0]['file']);
         \unlink($dir.'/path');
         \chmod($dir, permissions: 0o555);
@@ -259,14 +259,14 @@ final class SnapshotStoreTest extends TestCase
     {
         $project = new TempProject(['a.php' => "a\n"]);
         $history = new SnapshotStore($project->dir, $this->clock());
-        $history->snapshot($project->path('a.php'), "a1\n");
+        $history->snapshot($project->path('a.php'), content: "a1\n");
         $dir = \dirname((string) $history->list($project->path('a.php'))[0]['file']);
         \unlink($dir.'/path');
         \unlink($project->path('a.php'));
         $history->recent();
 
         \file_put_contents($project->path('a.php'), data: "back\n");
-        $history->snapshot($project->path('a.php'), "back\n");
+        $history->snapshot($project->path('a.php'), content: "back\n");
 
         $this->assertSame([$project->path('a.php')], \array_column($history->recent(), 'path'));
     }
@@ -280,7 +280,7 @@ final class SnapshotStoreTest extends TestCase
     {
         $project = new TempProject(['old.php' => "x\n"]);
         $history = new SnapshotStore($project->dir, $this->clock());
-        $history->snapshot($project->path('old.php'), "x1\n");
+        $history->snapshot($project->path('old.php'), content: "x1\n");
 
         $history->rename($project->path('old.php'), $project->path('new.php'));
 
@@ -293,7 +293,7 @@ final class SnapshotStoreTest extends TestCase
         $project = new TempProject(['src/Old/A.php' => "a\n", 'src/Old/deep/B.php' => "b\n", 'src/Oldish/C.php' => "c\n"]);
         $history = new SnapshotStore($project->dir, $this->clock());
         foreach (['src/Old/A.php', 'src/Old/deep/B.php', 'src/Oldish/C.php'] as $file) {
-            $history->snapshot($project->path($file), "v1\n");
+            $history->snapshot($project->path($file), content: "v1\n");
         }
         \rename($project->path('src/Old'), $project->path('src/New'));
 
@@ -310,7 +310,7 @@ final class SnapshotStoreTest extends TestCase
     {
         $project = new TempProject(['src/Old/A.php' => "a\n"]);
         $history = new SnapshotStore($project->dir, $this->clock());
-        $history->snapshot($project->path('src/Old/A.php'), "v1\n");
+        $history->snapshot($project->path('src/Old/A.php'), content: "v1\n");
         \unlink(\dirname((string) $history->list($project->path('src/Old/A.php'))[0]['file']).'/path');
         \rename($project->path('src/Old'), $project->path('src/New'));
 
@@ -324,7 +324,7 @@ final class SnapshotStoreTest extends TestCase
     {
         $project = new TempProject(['src/Old/A.php' => "a\n"]);
         $history = new SnapshotStore($project->dir, $this->clock(), scanLimit: 0);
-        $history->snapshot($project->path('src/Old/A.php'), "v1\n");
+        $history->snapshot($project->path('src/Old/A.php'), content: "v1\n");
         \unlink(\dirname((string) $history->list($project->path('src/Old/A.php'))[0]['file']).'/path');
         \rename($project->path('src/Old'), $project->path('src/New'));
 
@@ -340,9 +340,9 @@ final class SnapshotStoreTest extends TestCase
         $history = new SnapshotStore($project->dir, $clock);
         $path = $project->path('a.php');
 
-        $this->assertSame(0, $history->snapshot($path, "v1\n"));
+        $this->assertSame(0, $history->snapshot($path, content: "v1\n"));
         $clock->sleep(1);
-        $this->assertSame(0, $history->snapshot($path, "v2\n"));
+        $this->assertSame(0, $history->snapshot($path, content: "v2\n"));
 
         $list = $history->list($path);
         $this->assertCount(2, $list);
@@ -368,7 +368,7 @@ final class SnapshotStoreTest extends TestCase
         $history = new SnapshotStore($project->dir, $this->clock());
         $viaLink = $project->path('link/a.php');
 
-        $this->assertSame(0, $history->snapshot($viaLink, "v1\n"));
+        $this->assertSame(0, $history->snapshot($viaLink, content: "v1\n"));
         $this->assertCount(1, $history->list($viaLink), 'found while the file is there');
 
         \unlink($project->path('real/a.php'));
@@ -384,8 +384,8 @@ final class SnapshotStoreTest extends TestCase
         $history = new SnapshotStore($project->dir, $this->clock());
         $path = $project->path('a.php');
 
-        $history->snapshot($path, 'same');
-        $this->assertSame(0, $history->snapshot($path, 'same'), 'a no-op prunes nothing — and is no failure, which would read as -1');
+        $history->snapshot($path, content: 'same');
+        $this->assertSame(0, $history->snapshot($path, content: 'same'), 'a no-op prunes nothing — and is no failure, which would read as -1');
         $this->assertCount(1, $history->list($path));
     }
 
@@ -398,9 +398,9 @@ final class SnapshotStoreTest extends TestCase
         $history = new SnapshotStore($project->dir, $clock);
         $path = $project->path('a.php');
 
-        $history->snapshot($path, 'abc');
+        $history->snapshot($path, content: 'abc');
         $clock->sleep(1);
-        $history->snapshot($path, 'abd');
+        $history->snapshot($path, content: 'abd');
         $this->assertCount(2, $history->list($path), 'same length is not sameness');
     }
 
@@ -415,11 +415,11 @@ final class SnapshotStoreTest extends TestCase
         $history = new SnapshotStore($project->dir, $clock, maxPerFile: 1);
         $path = $project->path('a.php');
 
-        $history->snapshot($path, 'first');
+        $history->snapshot($path, content: 'first');
         $clock->sleep(1);
-        $this->assertSame(1, $history->snapshot($path, 'second'), 'the cap prunes the older stamp');
+        $this->assertSame(1, $history->snapshot($path, content: 'second'), 'the cap prunes the older stamp');
 
-        $this->assertSame(0, $history->snapshot($path, 'third'), 'the same-stamp overwrite prunes nothing');
+        $this->assertSame(0, $history->snapshot($path, content: 'third'), 'the same-stamp overwrite prunes nothing');
         $list = $history->list($path);
         $this->assertCount(1, $list);
         $this->assertSame('third', $history->read($list[0]['file']), 'the overwrite survives its own prune');
@@ -468,7 +468,7 @@ final class SnapshotStoreTest extends TestCase
         \file_put_contents($project->path('.porta/history'), data: 'not a dir');
 
         $history = new SnapshotStore($project->dir, $this->clock());
-        $this->assertSame(-1, $history->snapshot($project->path('a.php'), 'x'));
+        $this->assertSame(-1, $history->snapshot($project->path('a.php'), content: 'x'));
     }
 
     public function testSnapshotFailsWhenFileCannotBeWritten(): void
@@ -479,11 +479,11 @@ final class SnapshotStoreTest extends TestCase
 
         // First snapshot creates the per-file directory; make it read-only so
         // the next write fails.
-        $history->snapshot($path, 'first');
+        $history->snapshot($path, content: 'first');
         $dir = Probe::invoke($history, 'dirFor', $path);
         \chmod($dir, permissions: 0o555);
 
-        $this->assertSame(-1, $history->snapshot($path, 'second'));
+        $this->assertSame(-1, $history->snapshot($path, content: 'second'));
 
         \chmod($dir, permissions: 0o755); // restore so TempProject cleanup succeeds
     }
@@ -497,9 +497,9 @@ final class SnapshotStoreTest extends TestCase
         $clock = $this->clock();
         $history = new SnapshotStore($project->dir, $clock);
         $old = (string) \realpath($project->path('a.php'));
-        $history->snapshot($old, "v1\n");
+        $history->snapshot($old, content: "v1\n");
         $clock->sleep(1);
-        $history->snapshot($old, "v2\n");
+        $history->snapshot($old, content: "v2\n");
         \rename($old, $new = $project->path('b.php'));
 
         $history->rename($old, $new);
@@ -520,9 +520,9 @@ final class SnapshotStoreTest extends TestCase
         $history = new SnapshotStore($project->dir, $clock);
         $from = (string) \realpath($project->path('a.php'));
         $to = (string) \realpath($project->path('b.php'));
-        $history->snapshot($to, "resident\n");
+        $history->snapshot($to, content: "resident\n");
         $clock->sleep(1);
-        $history->snapshot($from, "moved\n");
+        $history->snapshot($from, content: "moved\n");
         $oldDir = \dirname((string) $history->list($from)[0]['file']);
         \rename($from, $to);
 
@@ -538,7 +538,7 @@ final class SnapshotStoreTest extends TestCase
     {
         $project = new TempProject(['a.php' => "v1\n", 'b.php' => "v1\n"]);
         $history = new SnapshotStore($project->dir, $this->clock());
-        $history->snapshot($project->path('b.php'), "v1\n");
+        $history->snapshot($project->path('b.php'), content: "v1\n");
 
         $history->rename($project->path('a.php'), $project->path('b.php'));
 
@@ -553,7 +553,7 @@ final class SnapshotStoreTest extends TestCase
         $project = new TempProject(['a.php' => 'x']);
         $history = new SnapshotStore($project->dir, $this->clock());
         $from = $project->path('a.php');
-        $history->snapshot($from, 'v1');
+        $history->snapshot($from, content: 'v1');
         $base = \dirname((string) Probe::invoke($history, 'dirFor', $from));
         \chmod($base, permissions: 0o555);
 
