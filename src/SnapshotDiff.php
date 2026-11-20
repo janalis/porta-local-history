@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Porta\LocalHistory;
 
 use Porta\Support\AsyncProcess;
-use Symfony\Component\Process\ExecutableFinder;
+use Porta\Support\PathExecutables;
 
 /**
  * What changed between a snapshot and the file as it stands.
@@ -36,7 +36,7 @@ final readonly class SnapshotDiff
     /** The git binary, or null when there is none on PATH. */
     public function binary(): ?string
     {
-        return $this->binary ?? new ExecutableFinder()->find('git');
+        return $this->binary ?? PathExecutables::here()->find('git');
     }
 
     /**
