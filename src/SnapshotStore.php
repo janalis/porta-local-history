@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Porta\LocalHistory;
 
+use Porta\Support\ComposerLayout;
 use Porta\Support\Files;
 use Psr\Clock\ClockInterface;
 use Symfony\Component\Filesystem\Exception\IOExceptionInterface;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Filesystem\Path;
 
 /**
  * Timestamped local snapshots of edited files, kept under
@@ -373,13 +375,19 @@ final readonly class SnapshotStore
         }
     }
 
-    /** Every file under $dir, past the tools' own folders and any it cannot read. */
+    /** Every file under $dir, past the tools' own folders, the vendor dir composer.json names, and any it cannot read. */
     private function filesUnder(string $dir): \RecursiveIteratorIterator
     {
+        $vendor = ComposerLayout::of($this->rootDir)->vendorDir;
+
         return new \RecursiveIteratorIterator(
             new \RecursiveCallbackFilterIterator(
                 new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS),
-                static fn (mixed $file): bool => !$file instanceof \SplFileInfo || !$file->isDir() || !\in_array($file->getFilename(), self::SKIP_DIRS, strict: true),
+                static fn (mixed $file): bool => (
+                    !$file instanceof \SplFileInfo
+                    || !$file->isDir()
+                    || (!\in_array($file->getFilename(), self::SKIP_DIRS, strict: true) && Path::canonicalize($file->getPathname()) !== $vendor)
+                ),
             ),
             \RecursiveIteratorIterator::LEAVES_ONLY,
             \RecursiveIteratorIterator::CATCH_GET_CHILD,

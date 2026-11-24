@@ -238,6 +238,19 @@ final class SnapshotStoreTest extends TestCase
         $this->assertSame([$project->path('vendor/x.php')], \array_column($history->recent(), 'path'), 'and a save still names it');
     }
 
+    /** A vendor dir composer.json moved is skipped like vendor/, and a folder of its name elsewhere is not. */
+    public function testAMovedVendorDirIsNotBackfilled(): void
+    {
+        $project = new TempProject(['composer.json' => '{"config":{"vendor-dir":"deps"}}', 'deps/x.php' => "x\n", 'src/deps/y.php' => "y\n"]);
+        $history = new SnapshotStore($project->dir, $this->clock());
+        foreach (['deps/x.php', 'src/deps/y.php'] as $file) {
+            $history->snapshot($project->path($file), content: "1\n");
+            \unlink(\dirname((string) $history->list($project->path($file))[0]['file']).'/path');
+        }
+
+        $this->assertSame([$project->path('src/deps/y.php')], \array_column($history->recent(), 'path'), 'the walk never entered deps/');
+    }
+
     /** A history directory gone read-only is not a reason for the project-wide list to fail. */
     public function testAnUnwritableSidecarIsSwallowedRatherThanThrown(): void
     {
